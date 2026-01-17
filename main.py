@@ -16,6 +16,11 @@ WEBHOOK_CONFIGS = [
         "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d",
         "targets": ["*"] 
     },
+        {
+        # 另一个企微审核群 (只推送支付宝米奇)
+        "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833",
+        "targets": ["米奇租赁官方"] 
+    },
     # 示例: 仅通知星享生活
     # {
     #     "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_OTHER_KEY",
@@ -36,7 +41,7 @@ PASSWORD = "Test0528."
 
 # 关键词与下拉选项的映射
 # 格式: "关键词": "下拉菜单选项名称"
-# 请根据实际情况修改此处
+# 请根据实际情况修改此处，商家对应分配的商品关键词
 KEYWORD_MAPPING = {
     # 星享生活
     "G7X3": "星享生活",
