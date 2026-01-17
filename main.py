@@ -240,17 +240,46 @@ def run():
         print("检测到目标页面，开始执行自动化流程...")
 
         while True:
-            # 循环开始前，先获取待处理数量
-            # Selector: #pagination > div > ul > li > span
+            print(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
+            
+            # 2. 检查待审核数量
+            # 尝试优先从 Tab 上获取数量，因为分页器在无数据时可能不存在
+            # Tab Selector: #myTab > li:nth-child(3) > a
+            try:
+                # 检查 Tab 上的待审核数量 (如果有)
+                tab_count_selector = "#myTab > li:nth-child(3) > a"
+                if page.locator(tab_count_selector).is_visible():
+                    tab_text = page.locator(tab_count_selector).inner_text()
+                    # tab_text 可能是 "待审核(0)" 格式
+                    if "(" in tab_text and ")" in tab_text:
+                        import re
+                        match = re.search(r"\((\d+)\)", tab_text)
+                        if match:
+                            count_val = int(match.group(1))
+                            print(f"Tab 显示待审核数量: {count_val}")
+                            if count_val == 0:
+                                print("待审核数量为 0，等待 10 秒后重试...")
+                                time.sleep(10)
+                                print("正在刷新页面...")
+                                try:
+                                    page.reload(timeout=60000)
+                                    page.wait_for_load_state("networkidle", timeout=60000)
+                                except Exception as e:
+                                    print(f"刷新页面超时或失败 (已忽略): {e}")
+                                continue
+            except Exception as e:
+                print(f"检查 Tab 数量出错: {e}，继续尝试其他方式...")
+
+            # 原有的分页器检查逻辑 (作为备份)
             count_selector = "#pagination > div > ul > li > span"
             try:
                 # 尝试获取数量
                 if page.locator(count_selector).is_visible():
                     count_text = page.locator(count_selector).inner_text().strip()
-                    print(f"当前待处理数量: {count_text}")
+                    print(f"分页器显示数量: {count_text}")
                     if count_text == "0":
-                        print("待处理数量为 0，等待 1 分钟后重试...")
-                        time.sleep(60) # 等待 1 分钟
+                        print("待处理数量为 0，等待 10 秒后重试...")
+                        time.sleep(10) # 等待 10 秒
                         # 刷新页面以获取最新数据
                         print("正在刷新页面...")
                         try:
@@ -261,7 +290,8 @@ def run():
                         # 刷新后重新进入循环检查
                         continue
                 else:
-                     print("未找到数量统计元素，假设有数据继续执行...")
+                     # print("未找到数量统计元素，假设有数据继续执行...")
+                     pass
             except Exception as e:
                 print(f"获取待处理数量失败: {e}，继续尝试执行...")
 
@@ -498,8 +528,8 @@ def run():
                     print(f"刷新页面超时或失败 (已忽略): {e}")
             else:
                 print("当前列表中没有符合条件（商户为'米奇租赁'）的订单。")
-                print("等待 3 分钟后重试...")
-                time.sleep(180)
+                print("等待 10 秒后重试...")
+                time.sleep(10)
                 try:
                     print("正在刷新页面...")
                     page.reload(timeout=60000)
