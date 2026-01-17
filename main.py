@@ -248,8 +248,10 @@ def run():
             try:
                 # 检查 Tab 上的待审核数量 (如果有)
                 tab_count_selector = "#myTab > li:nth-child(3) > a"
-                if page.locator(tab_count_selector).is_visible():
-                    tab_text = page.locator(tab_count_selector).inner_text()
+                # 页面上可能有多个 Tab 元素（响应式布局），取第一个可见的
+                tab_locator = page.locator(tab_count_selector).first
+                if tab_locator.is_visible():
+                    tab_text = tab_locator.inner_text()
                     # tab_text 可能是 "待审核(0)" 格式
                     if "(" in tab_text and ")" in tab_text:
                         import re
