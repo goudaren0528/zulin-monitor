@@ -1,11 +1,21 @@
-from playwright.sync_api import sync_playwright
 import time
 import requests
+import uiautomation as auto
+import pyperclip
+from playwright.sync_api import sync_playwright
 
 # --- 配置区域 ---
 # 目标网址
 URL = "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+# 企业微信 Webhook 地址 (用于通用通知，如需恢复请取消注释并填写)
 WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+
+# RPA通知配置: 针对特定分配对象的群名映射
+# 格式: "分配对象名称": "企业微信群名"
+RPA_GROUP_MAPPING = {
+    "星享生活": "星享生活米奇支付宝入驻",
+    # "米奇租赁官方": "", # 留空则不发送通知
+}
 
 # 登录账号配置 (如果为空则需手动登录)
 USERNAME = "伟填" 
@@ -47,26 +57,64 @@ KEYWORD_MAPPING = {
 
 def send_notification(order_title, assigned_to):
     """
-    发送企业微信通知
+    根据分配对象决定通知方式
     :param order_title: 订单标题
     :param assigned_to: 分配给谁
     """
+    # 1. 检查是否需要 RPA 通知 (针对特定分配对象)
+    target_group = RPA_GROUP_MAPPING.get(assigned_to)
+    
+    if target_group:
+        print(f"-> 分配给 [{assigned_to}]，触发 RPA 通知到群: [{target_group}]")
+        send_rpa_notification(order_title, assigned_to, target_group)
+    else:
+        print(f"-> 分配给 [{assigned_to}]，无需 RPA 通知 (未配置群名或留空)")
+
+def send_rpa_notification(order_title, assigned_to, group_name):
+    """
+    执行 RPA 发送逻辑
+    """
     try:
         content = f"订单已分配通知\n\n订单标题：{order_title}\n分配给：{assigned_to}"
-        payload = {
-            "msgtype": "text",
-            "text": {
-                "content": content
-            }
-        }
-        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
-        if response.status_code == 200:
-            clean_content = content.replace('\n', ' ')
-            print(f"-> 通知已发送: {clean_content}")
-        else:
-            print(f"-> 通知发送失败: {response.text}")
+        
+        # 1. 查找企业微信窗口
+        wechat_window = auto.WindowControl(searchDepth=1, Name="企业微信")
+        if not wechat_window.Exists(0):
+            wechat_window = auto.WindowControl(searchDepth=1, ClassName="WeWorkWindow")
+            
+        if not wechat_window.Exists(0):
+            print("-> [错误] 未找到企业微信窗口，RPA通知发送失败！")
+            return
+            
+        # 2. 激活窗口并置顶
+        wechat_window.SetActive()
+        wechat_window.SetTopmost(True)
+        time.sleep(0.5)
+        
+        # 3. 搜索群聊
+        wechat_window.SendKeys('{Ctrl}f')
+        time.sleep(0.5)
+        
+        pyperclip.copy(group_name)
+        wechat_window.SendKeys('{Ctrl}v')
+        time.sleep(1.5) # 等待搜索结果
+        wechat_window.SendKeys('{Enter}') # 选中
+        time.sleep(0.5)
+        
+        # 4. 发送消息
+        pyperclip.copy(content)
+        wechat_window.SendKeys('{Ctrl}v')
+        time.sleep(0.5)
+        wechat_window.SendKeys('{Enter}') # 发送
+        
+        # 5. 恢复窗口状态
+        wechat_window.SetTopmost(False)
+        wechat_window.Minimize()
+        
+        print(f"-> RPA 通知已发送")
+        
     except Exception as e:
-        print(f"-> 发送通知时出错: {e}")
+        print(f"-> RPA 发送通知时出错: {e}")
 
 def run():
     with sync_playwright() as p:
@@ -225,10 +273,12 @@ def run():
                         continue
                         
                     merchant_name = page.locator(merchant_selector).inner_text().strip()
-                    print(f"检查第 {i - 2} 个订单，商户名称: [{merchant_name}]")
+                    # 清理 "商户名称：" 前缀
+                    merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
+                    print(f"检查第 {i - 2} 个订单，商户名称: [{merchant_name}] -> 清理后: [{merchant_name_clean}]")
                     
-                    if merchant_name != "米奇租赁":
-                        print(f"-> 商户[{merchant_name}]不是'米奇租赁'，不需要分配，跳过。")
+                    if merchant_name_clean != "米奇租赁":
+                        print(f"-> 商户[{merchant_name_clean}]不是'米奇租赁'，不需要分配，跳过。")
                         continue
                     
                     print("-> 商户匹配，开始处理此订单...")
