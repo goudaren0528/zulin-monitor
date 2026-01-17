@@ -253,8 +253,11 @@ def run():
                         time.sleep(60) # 等待 1 分钟
                         # 刷新页面以获取最新数据
                         print("正在刷新页面...")
-                        page.reload()
-                        page.wait_for_load_state("networkidle")
+                        try:
+                            page.reload(timeout=60000)
+                            page.wait_for_load_state("networkidle", timeout=60000)
+                        except Exception as e:
+                            print(f"刷新页面超时或失败 (已忽略): {e}")
                         # 刷新后重新进入循环检查
                         continue
                 else:
@@ -488,14 +491,21 @@ def run():
             if processed_order:
                 print("本轮循环已处理过订单，等待 3 秒后刷新页面...")
                 time.sleep(3)
-                page.reload()
-                page.wait_for_load_state("networkidle")
+                try:
+                    page.reload(timeout=60000)
+                    page.wait_for_load_state("networkidle", timeout=60000)
+                except Exception as e:
+                    print(f"刷新页面超时或失败 (已忽略): {e}")
             else:
                 print("当前列表中没有符合条件（商户为'米奇租赁'）的订单。")
                 print("等待 3 分钟后重试...")
                 time.sleep(180)
-                page.reload()
-                page.wait_for_load_state("networkidle")
+                try:
+                    print("正在刷新页面...")
+                    page.reload(timeout=60000)
+                    page.wait_for_load_state("networkidle", timeout=60000)
+                except Exception as e:
+                    print(f"刷新页面超时或失败 (已忽略): {e}")
 
         # 保持浏览器开启一段时间以便查看结果 (这句在死循环后实际上达不到)
 
