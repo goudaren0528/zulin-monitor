@@ -1,9 +1,11 @@
 from playwright.sync_api import sync_playwright
 import time
+import requests
 
 # --- 配置区域 ---
 # 目标网址
 URL = "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
 
 # 登录账号配置 (如果为空则需手动登录)
 USERNAME = "伟填" 
@@ -42,6 +44,29 @@ KEYWORD_MAPPING = {
     "Ulike": "米奇租赁官方"
 }
 # ----------------
+
+def send_notification(order_title, assigned_to):
+    """
+    发送企业微信通知
+    :param order_title: 订单标题
+    :param assigned_to: 分配给谁
+    """
+    try:
+        content = f"订单已分配通知\n\n订单标题：{order_title}\n分配给：{assigned_to}"
+        payload = {
+            "msgtype": "text",
+            "text": {
+                "content": content
+            }
+        }
+        response = requests.post(WEBHOOK_URL, json=payload, timeout=10)
+        if response.status_code == 200:
+            clean_content = content.replace('\n', ' ')
+            print(f"-> 通知已发送: {clean_content}")
+        else:
+            print(f"-> 通知发送失败: {response.text}")
+    except Exception as e:
+        print(f"-> 发送通知时出错: {e}")
 
 def run():
     with sync_playwright() as p:
@@ -114,8 +139,8 @@ def run():
                     count_text = page.locator(count_selector).inner_text().strip()
                     print(f"当前待处理数量: {count_text}")
                     if count_text == "0":
-                        print("待处理数量为 0，等待 3 分钟后重试...")
-                        time.sleep(180) # 等待 3 分钟
+                        print("待处理数量为 0，等待 1 分钟后重试...")
+                        time.sleep(60) # 等待 1 分钟
                         # 刷新页面以获取最新数据
                         print("正在刷新页面...")
                         page.reload()
@@ -327,6 +352,10 @@ def run():
                                 page.locator("button:has-text('提交')").click()
                         
                         print("订单提交动作已执行！")
+                        
+                        # 发送通知
+                        send_notification(text_content, target_option)
+
                         # 等待一下看弹窗是否关闭，确认提交成功
                         time.sleep(2)
                         
