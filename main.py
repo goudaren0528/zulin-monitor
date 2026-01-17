@@ -7,8 +7,21 @@ from playwright.sync_api import sync_playwright
 # --- 配置区域 ---
 # 目标网址
 URL = "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
-# 企业微信 Webhook 地址 (用于通用通知，如需恢复请取消注释并填写)
-WEBHOOK_URL = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+# 内部 Webhook 通知配置 (支持多 Webhook)
+# 格式: {"url": "webhook地址", "targets": ["分配对象1", "分配对象2"]}
+# 如果 targets 为 ["*"] 或空列表，则匹配所有分配对象
+WEBHOOK_CONFIGS = [
+    {
+        # 默认通知群 (所有对象)
+        "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d",
+        "targets": ["*"] 
+    },
+    # 示例: 仅通知星享生活
+    # {
+    #     "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_OTHER_KEY",
+    #     "targets": ["星享生活"]
+    # }
+]
 
 # RPA通知配置: 针对特定分配对象的群名映射
 # 格式: "分配对象名称": "企业微信群名"
@@ -64,25 +77,35 @@ def send_notification(order_title, assigned_to):
     # 商家后台链接 (用于通知)
     merchant_url = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
 
-    # --- 1. Webhook 通知 (内部群) ---
-    if WEBHOOK_URL:
-        try:
-            # 构造简单的文本通知
-            if assigned_to == "米奇租赁官方":
-                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
-            else:
-                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+    # --- 1. Webhook 通知 (内部群 - 支持多配置) ---
+    if WEBHOOK_CONFIGS:
+        for config in WEBHOOK_CONFIGS:
+            webhook_url = config.get("url")
+            targets = config.get("targets", [])
+            
+            # 检查是否匹配当前分配对象
+            # 如果 targets 包含 "*" 或为空列表，或者是当前分配对象，则发送
+            if not webhook_url:
+                continue
                 
-            payload = {
-                "msgtype": "text",
-                "text": {
-                    "content": webhook_content
-                }
-            }
-            resp = requests.post(WEBHOOK_URL, json=payload)
-            print(f"-> Webhook 通知已发送，状态码: {resp.status_code}")
-        except Exception as e:
-            print(f"-> Webhook 发送失败: {e}")
+            if "*" in targets or not targets or assigned_to in targets:
+                try:
+                    # 构造通知内容
+                    if assigned_to == "米奇租赁官方":
+                        webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
+                    else:
+                        webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+                        
+                    payload = {
+                        "msgtype": "text",
+                        "text": {
+                            "content": webhook_content
+                        }
+                    }
+                    resp = requests.post(webhook_url, json=payload)
+                    print(f"-> Webhook 通知已发送至 [{webhook_url[-6:]}...]，状态码: {resp.status_code}")
+                except Exception as e:
+                    print(f"-> Webhook 发送失败: {e}")
 
     # --- 2. RPA 通知 (外部群 - 目前暂时禁用) ---
     target_group = RPA_GROUP_MAPPING.get(assigned_to)
