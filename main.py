@@ -263,9 +263,10 @@ def run():
                      print("找到了 body 元素，但未找到 Tab。可能是登录未成功或页面结构不同。")
 
             # 无论上面是否找到，都尝试继续，或者抛出异常让外层捕获
-            # 这里恢复原来的 wait_for_selector，但放宽条件
-            print("最终确认：等待 #myTab 或 .nav-tabs...")
-            page.wait_for_selector("#myTab, .nav-tabs, ul.nav", timeout=60000)
+            # 这里恢复原来的 wait_for_selector，但放宽条件，只要能找到“待审核”或者 tab 都可以
+            print("最终确认：等待页面关键元素 (Tab 或 文本)...")
+            # 只要满足其中一个选择器即可
+            page.wait_for_selector("#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')", timeout=60000)
 
         except Exception as e:
             print("等待超时或出错，请检查是否已登录。")
@@ -278,13 +279,12 @@ def run():
             
             # 2. 检查待审核数量
             # 尝试优先从 Tab 上获取数量，因为分页器在无数据时可能不存在
-            # Tab Selector: #myTab > li:nth-child(3) > a
             try:
                 # 检查 Tab 上的待审核数量 (如果有)
-                tab_count_selector = "#myTab > li:nth-child(3) > a"
-                # 页面上可能有多个 Tab 元素（响应式布局），取第一个可见的
-                tab_locator = page.locator(tab_count_selector).first
-                if tab_locator.is_visible():
+                # 优先使用文本定位，比 CSS ID 更稳健
+                tab_locator = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
+                
+                if tab_locator.count() > 0 and tab_locator.is_visible():
                     tab_text = tab_locator.inner_text()
                     # tab_text 可能是 "待审核(0)" 格式
                     if "(" in tab_text and ")" in tab_text:
@@ -332,40 +332,43 @@ def run():
                 print(f"获取待处理数量失败: {e}，继续尝试执行...")
 
             # 1. 点击 Tab
-            # Selector: #myTab > li:nth-child(3) > a
             # 优化：检查是否已经激活，避免重复点击；只点击可见元素
             try:
-                tab_li_selector = "#myTab > li:nth-child(3)"
-                tab_link_selector = f"{tab_li_selector} > a"
+                # 使用文本定位 "待审核"
+                target_link = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
                 
                 is_active = False
                 try:
                     # 获取可见的 Tab 链接
-                    # 页面上可能有多个匹配元素（如响应式布局），只关注可见的
-                    target_link = page.locator(tab_link_selector).filter(has=page.locator("visible=true")).first
-                    
                     if target_link.count() > 0 and target_link.is_visible():
                         # 检查 a 标签的 class
                         a_class = target_link.get_attribute("class")
-                        # 检查 li 标签的 class
-                        li_class = page.get_attribute(tab_li_selector, "class")
+                        
+                        # 检查父元素 li 的 class (通常 Tab 结构是 ul > li > a)
+                        li_class = ""
+                        try:
+                            parent_li = target_link.locator("xpath=..")
+                            li_class = parent_li.get_attribute("class")
+                        except:
+                            pass
                         
                         # 只要有一个包含 active，就认为是激活状态
-                        # 注意：日志显示 class 可能是 "activesa activesdef"，包含 "active" 子串
                         if (li_class and "active" in li_class) or (a_class and "active" in a_class):
                             is_active = True
                     else:
-                        print("未找到可见的 Tab 链接，可能选择器不匹配。")
+                        print("未找到可见的 '待审核' 链接。")
                 except Exception as e:
                     print(f"检查 Tab 状态时出错: {e}")
                     pass
 
                 if not is_active:
-                    print("点击 '待审' Tab...")
-                    # 强制点击可见的那个
-                    page.locator(tab_link_selector).filter(has=page.locator("visible=true")).first.click()
-                    page.wait_for_load_state("networkidle")
-                    time.sleep(2)
+                    if target_link.count() > 0:
+                        print("点击 '待审' Tab...")
+                        target_link.click()
+                        page.wait_for_load_state("networkidle")
+                        time.sleep(2)
+                    else:
+                         print("无法点击 Tab: 未找到目标元素")
                 else:
                     print("当前已在 '待审' Tab，无需点击。")
             except Exception as e:
