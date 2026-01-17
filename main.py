@@ -227,12 +227,46 @@ def run():
         # 等待登录
         print("请在浏览器中完成登录（如果需要）...")
         print("注意：如果手动登录，登录后请确保跳转到订单列表页面...")
-        print("脚本将在检测到目标页面元素（Tab 标签栏）后继续执行，最长等待 120 秒...")
+        print(f"当前页面标题: {page.title()}")
+        print(f"当前页面URL: {page.url}")
         
         try:
-            # 等待登录完成，以看到 tab 为准
-            # 原先检测列表按钮在无数据时不一定存在，改为检测 Tab 栏 (#myTab)
-            page.wait_for_selector("#myTab", timeout=120000)
+            # 增加调试信息：检查页面是否包含 iframe
+            frames = page.frames
+            print(f"检测到 {len(frames)} 个 frame (框架)")
+            
+            # 尝试等待页面加载完成
+            print("等待页面网络空闲...")
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            except:
+                print("等待网络空闲超时，继续尝试查找元素...")
+
+            print("正在尝试定位 Tab 栏...")
+            # 尝试多种选择器
+            try:
+                # 优先尝试用户提供的 #myTab
+                page.wait_for_selector("#myTab", timeout=10000)
+                print("成功找到 #myTab")
+            except:
+                print("未找到 #myTab，尝试查找包含'待发货'或'待审核'的链接...")
+                # 尝试通过文本查找
+                if page.get_by_text("待发货").count() > 0 or page.get_by_text("待审核").count() > 0:
+                     print("通过文本找到了 Tab 相关的文字")
+                else:
+                     # 打印页面源码的前 1000 个字符帮助诊断
+                     print("未找到常见元素，页面源码前 500 字符:")
+                     print(page.content()[:500])
+                     
+                     # 再次尝试更通用的 body
+                     page.wait_for_selector("body", timeout=10000)
+                     print("找到了 body 元素，但未找到 Tab。可能是登录未成功或页面结构不同。")
+
+            # 无论上面是否找到，都尝试继续，或者抛出异常让外层捕获
+            # 这里恢复原来的 wait_for_selector，但放宽条件
+            print("最终确认：等待 #myTab 或 .nav-tabs...")
+            page.wait_for_selector("#myTab, .nav-tabs, ul.nav", timeout=60000)
+
         except Exception as e:
             print("等待超时或出错，请检查是否已登录。")
             return
