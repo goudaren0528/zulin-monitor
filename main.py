@@ -61,16 +61,36 @@ def send_notification(order_title, assigned_to):
     :param order_title: 订单标题
     :param assigned_to: 分配给谁
     """
-    # 1. 检查是否需要 RPA 通知 (针对特定分配对象)
+    # 商家后台链接 (用于通知)
+    merchant_url = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+
+    # --- 1. Webhook 通知 (内部群) ---
+    if WEBHOOK_URL:
+        try:
+            # 构造简单的文本通知
+            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
+            payload = {
+                "msgtype": "text",
+                "text": {
+                    "content": webhook_content
+                }
+            }
+            resp = requests.post(WEBHOOK_URL, json=payload)
+            print(f"-> Webhook 通知已发送，状态码: {resp.status_code}")
+        except Exception as e:
+            print(f"-> Webhook 发送失败: {e}")
+
+    # --- 2. RPA 通知 (外部群 - 目前暂时禁用) ---
     target_group = RPA_GROUP_MAPPING.get(assigned_to)
     
     if target_group:
-        print(f"-> 分配给 [{assigned_to}]，触发 RPA 通知到群: [{target_group}]")
+        # print(f"-> 分配给 [{assigned_to}]，触发 RPA 通知到群: [{target_group}]")
         # 暂时注释掉 RPA 通知
         # send_rpa_notification(order_title, assigned_to, target_group)
-        print("-> [调试] RPA 通知已暂时禁用")
+        print(f"-> [调试] RPA 通知已暂时禁用 (目标群: {target_group})")
     else:
-        print(f"-> 分配给 [{assigned_to}]，无需 RPA 通知 (未配置群名或留空)")
+        # print(f"-> 分配给 [{assigned_to}]，无需 RPA 通知")
+        pass
 
 def send_rpa_notification(order_title, assigned_to, group_name):
     """
