@@ -227,12 +227,12 @@ def run():
         # 等待登录
         print("请在浏览器中完成登录（如果需要）...")
         print("注意：如果手动登录，登录后请确保跳转到订单列表页面...")
-        print("脚本将在检测到目标页面元素（列表按钮）后继续执行，最长等待 120 秒...")
+        print("脚本将在检测到目标页面元素（Tab 标签栏）后继续执行，最长等待 120 秒...")
         
         try:
             # 等待登录完成，以看到 tab 为准
-            # 用户更新：改为检测列表中的按钮是否显示
-            page.wait_for_selector("#table > div > div > div > div:nth-child(2) > div > button", timeout=120000)
+            # 原先检测列表按钮在无数据时不一定存在，改为检测 Tab 栏 (#myTab)
+            page.wait_for_selector("#myTab", timeout=120000)
         except Exception as e:
             print("等待超时或出错，请检查是否已登录。")
             return
@@ -260,8 +260,8 @@ def run():
                             count_val = int(match.group(1))
                             print(f"Tab 显示待审核数量: {count_val}")
                             if count_val == 0:
-                                print("待审核数量为 0，等待 10 秒后重试...")
-                                time.sleep(10)
+                                print("待审核数量为 0，等待 30 秒后重试...")
+                                time.sleep(30)
                                 print("正在刷新页面...")
                                 try:
                                     page.reload(timeout=60000)
@@ -280,8 +280,8 @@ def run():
                     count_text = page.locator(count_selector).inner_text().strip()
                     print(f"分页器显示数量: {count_text}")
                     if count_text == "0":
-                        print("待处理数量为 0，等待 10 秒后重试...")
-                        time.sleep(10) # 等待 10 秒
+                        print("待处理数量为 0，等待 30 秒后重试...")
+                        time.sleep(30) # 等待 30 秒
                         # 刷新页面以获取最新数据
                         print("正在刷新页面...")
                         try:
@@ -530,8 +530,8 @@ def run():
                     print(f"刷新页面超时或失败 (已忽略): {e}")
             else:
                 print("当前列表中没有符合条件（商户为'米奇租赁'）的订单。")
-                print("等待 10 秒后重试...")
-                time.sleep(10)
+                print("等待 30 秒后重试...")
+                time.sleep(30)
                 try:
                     print("正在刷新页面...")
                     page.reload(timeout=60000)
