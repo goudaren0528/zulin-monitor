@@ -68,7 +68,11 @@ def send_notification(order_title, assigned_to):
     if WEBHOOK_URL:
         try:
             # 构造简单的文本通知
-            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+            if assigned_to == "米奇租赁官方":
+                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
+            else:
+                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+                
             payload = {
                 "msgtype": "text",
                 "text": {
