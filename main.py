@@ -66,7 +66,9 @@ def send_notification(order_title, assigned_to):
     
     if target_group:
         print(f"-> 分配给 [{assigned_to}]，触发 RPA 通知到群: [{target_group}]")
-        send_rpa_notification(order_title, assigned_to, target_group)
+        # 暂时注释掉 RPA 通知
+        # send_rpa_notification(order_title, assigned_to, target_group)
+        print("-> [调试] RPA 通知已暂时禁用")
     else:
         print(f"-> 分配给 [{assigned_to}]，无需 RPA 通知 (未配置群名或留空)")
 
