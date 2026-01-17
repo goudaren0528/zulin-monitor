@@ -75,8 +75,16 @@ def send_rpa_notification(order_title, assigned_to, group_name):
     执行 RPA 发送逻辑
     """
     try:
-        content = f"订单已分配通知\n\n订单标题：{order_title}\n分配给：{assigned_to}"
-        
+        # 商家后台链接
+        merchant_url = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+
+        # 拟人化话术
+        if assigned_to == "星享生活":
+            content = f"老板，有新订单需要处理哈~ 辛苦处理下：\n{order_title}\n\n处理链接：{merchant_url}"
+        else:
+            # 默认话术
+            content = f"您好，有新订单分配给您，请及时处理：\n{order_title}\n\n处理链接：{merchant_url}"
+            
         # 1. 查找企业微信窗口
         wechat_window = auto.WindowControl(searchDepth=1, Name="企业微信")
         if not wechat_window.Exists(0):
