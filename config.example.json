@@ -1,0 +1,19 @@
+{
+    "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+    "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+    "username": "YOUR_USERNAME_HERE",
+    "password": "YOUR_PASSWORD_HERE",
+    "webhook_configs": [
+        {
+            "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY_HERE",
+            "targets": ["*"]
+        }
+    ],
+    "rpa_group_mapping": {
+        "星享生活": "星享生活米奇支付宝入驻"
+    },
+    "keyword_mapping": {
+        "G7X3": "星享生活",
+        "佳能ixus130": "米奇租赁官方"
+    }
+}

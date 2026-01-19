@@ -2,75 +2,37 @@ import time
 import requests
 import uiautomation as auto
 import pyperclip
+import json
+import os
 from playwright.sync_api import sync_playwright
 
-# --- 配置区域 ---
-# 目标网址
-URL = "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
-# 内部 Webhook 通知配置 (支持多 Webhook)
-# 格式: {"url": "webhook地址", "targets": ["分配对象1", "分配对象2"]}
-# 如果 targets 为 ["*"] 或空列表，则匹配所有分配对象
-WEBHOOK_CONFIGS = [
-    {
-        # 默认通知群 (所有对象)
-        "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d",
-        "targets": ["*"] 
-    },
-        {
-        # 另一个企微审核群 (只推送支付宝米奇)
-        "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833",
-        "targets": ["米奇租赁官方"] 
-    },
-    # 示例: 仅通知星享生活
-    # {
-    #     "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_OTHER_KEY",
-    #     "targets": ["星享生活"]
-    # }
-]
+# --- 配置加载区域 ---
+def load_config():
+    config_path = "config.json"
+    if not os.path.exists(config_path):
+        print(f"错误: 找不到配置文件 {config_path}")
+        return None
+    
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"读取配置文件失败: {e}")
+        return None
 
-# RPA通知配置: 针对特定分配对象的群名映射
-# 格式: "分配对象名称": "企业微信群名"
-RPA_GROUP_MAPPING = {
-    "星享生活": "星享生活米奇支付宝入驻",
-    # "米奇租赁官方": "", # 留空则不发送通知
-}
+CONFIG = load_config()
+if not CONFIG:
+    exit(1)
 
-# 登录账号配置 (如果为空则需手动登录)
-USERNAME = "伟填" 
-PASSWORD = "Test0528."
+# 从配置中提取变量
+URL = CONFIG.get("url", "")
+MERCHANT_URL = CONFIG.get("merchant_url", "") # 提取 merchant_url
+WEBHOOK_CONFIGS = CONFIG.get("webhook_configs", [])
+RPA_GROUP_MAPPING = CONFIG.get("rpa_group_mapping", {})
+USERNAME = CONFIG.get("username", "")
+PASSWORD = CONFIG.get("password", "")
+KEYWORD_MAPPING = CONFIG.get("keyword_mapping", {})
 
-# 关键词与下拉选项的映射
-# 格式: "关键词": "下拉菜单选项名称"
-# 请根据实际情况修改此处，商家对应分配的商品关键词
-KEYWORD_MAPPING = {
-    # 星享生活
-    "G7X3": "星享生活",
-    "G7X2": "星享生活",
-    "RF100-400mm": "星享生活",
-    "佳能RF-S 55-210": "星享生活",
-    "佳能RF-S 18-150": "星享生活",
-    "佳能 RF50m": "星享生活",
-    "佳能 R50": "星享生活",
-    "松下": "星享生活",
-    "尼康": "星享生活",
-
-    # 米奇租赁官方
-    "佳能ixus130": "米奇租赁官方",
-    "SQ1": "米奇租赁官方",
-    "mini12": "米奇租赁官方",
-    "mini11": "米奇租赁官方",
-    "mini99": "米奇租赁官方",
-    "mini90": "米奇租赁官方",
-    "mini40": "米奇租赁官方",
-    "action5": "米奇租赁官方",
-    "action4": "米奇租赁官方",
-    "Galaxy S23Ultra": "米奇租赁官方",
-    "X300": "米奇租赁官方",
-    "X200": "米奇租赁官方",
-    "SX740": "米奇租赁官方",
-    "wide": "米奇租赁官方",
-    "Ulike": "米奇租赁官方"
-}
 # ----------------
 
 def send_notification(order_title, assigned_to):
@@ -79,8 +41,8 @@ def send_notification(order_title, assigned_to):
     :param order_title: 订单标题
     :param assigned_to: 分配给谁
     """
-    # 商家后台链接 (用于通知)
-    merchant_url = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+    # 商家后台链接 (用于通知) - 已从配置获取
+    merchant_url = MERCHANT_URL
 
     # --- 1. Webhook 通知 (内部群 - 支持多配置) ---
     if WEBHOOK_CONFIGS:
@@ -129,8 +91,8 @@ def send_rpa_notification(order_title, assigned_to, group_name):
     执行 RPA 发送逻辑
     """
     try:
-        # 商家后台链接
-        merchant_url = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+        # 商家后台链接 - 已从配置获取
+        merchant_url = MERCHANT_URL
 
         # 拟人化话术
         if assigned_to == "星享生活":
@@ -181,8 +143,9 @@ def send_rpa_notification(order_title, assigned_to, group_name):
 def run():
     with sync_playwright() as p:
         # 启动浏览器，headless=False 表示显示浏览器窗口，方便手动登录
+        # args=["--window-position=-2400,-2400"] 将窗口移动到屏幕可视区域外
         print("正在启动浏览器...")
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=False, args=["--window-position=-2400,-2400"])
         context = browser.new_context()
         page = context.new_page()
 
