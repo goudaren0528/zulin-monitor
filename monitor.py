@@ -106,6 +106,9 @@ class InterfaceMonitor:
         target_url = self.get_config("url", "")
         scan_interval = self.get_config("scan_interval", 300)
         
+        # Force headless mode in Docker environment to prevent XServer errors
+        headless = True
+        
         monitor_log(f"启动监控浏览器... (Headless: {headless})")
         
         try:
