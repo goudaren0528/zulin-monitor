@@ -6,7 +6,7 @@ services:
     container_name: order-point
     restart: always
     ports:
-      - "5050:5050"
+      - "3000:3000"
     volumes:
       - ./config.json:/app/config.json
     environment:

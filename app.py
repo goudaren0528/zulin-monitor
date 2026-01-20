@@ -81,4 +81,4 @@ def handle_config():
 
 if __name__ == '__main__':
     # Listen on all interfaces for Docker
-    app.run(host='0.0.0.0', port=5050, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=3000, debug=True, use_reloader=False)
