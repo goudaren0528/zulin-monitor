@@ -1,4 +1,5 @@
 playwright
 requests
-uiautomation
+flask
+# uiautomation # Windows only, commented out for Docker compatibility
 pyperclip

@@ -15,5 +15,18 @@
     "keyword_mapping": {
         "G7X3": "星享生活",
         "佳能ixus130": "米奇租赁官方"
+    },
+    "scan_interval": 60,
+    "headless": true,
+    "monitor_config": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log",
+        "scan_interval": 300,
+        "webhook_url": "YOUR_MONITOR_WEBHOOK_URL",
+        "headless": true,
+        "items": [
+            { "name": "百融风控", "threshold": 100 },
+            { "name": "E签宝静默签人脸", "threshold": 100 },
+            { "name": "短信发送", "threshold": 100 }
+        ]
     }
 }

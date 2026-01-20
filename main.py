@@ -1,551 +1,394 @@
 import time
 import requests
-import uiautomation as auto
-import pyperclip
 import json
 import os
+import threading
+import sys
 from playwright.sync_api import sync_playwright
 
-# --- 配置加载区域 ---
-def load_config():
-    config_path = "config.json"
-    if not os.path.exists(config_path):
-        print(f"错误: 找不到配置文件 {config_path}")
-        return None
-    
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"读取配置文件失败: {e}")
-        return None
+# Try importing Windows-specific libraries safely
+try:
+    import uiautomation as auto
+    HAS_UIAUTOMATION = True
+except ImportError:
+    HAS_UIAUTOMATION = False
 
-CONFIG = load_config()
-if not CONFIG:
-    exit(1)
+try:
+    import pyperclip
+    HAS_PYPERCLIP = True
+except ImportError:
+    HAS_PYPERCLIP = False
 
-# 从配置中提取变量
-URL = CONFIG.get("url", "")
-MERCHANT_URL = CONFIG.get("merchant_url", "") # 提取 merchant_url
-WEBHOOK_CONFIGS = CONFIG.get("webhook_configs", [])
-RPA_GROUP_MAPPING = CONFIG.get("rpa_group_mapping", {})
-USERNAME = CONFIG.get("username", "")
-PASSWORD = CONFIG.get("password", "")
-KEYWORD_MAPPING = CONFIG.get("keyword_mapping", {})
+# Global log buffer for Web UI
+LOG_BUFFER = []
+MAX_LOG_SIZE = 500
 
-# ----------------
+def log(message):
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    formatted_msg = f"[{timestamp}] {message}"
+    print(formatted_msg)
+    LOG_BUFFER.append(formatted_msg)
+    if len(LOG_BUFFER) > MAX_LOG_SIZE:
+        LOG_BUFFER.pop(0)
 
-def send_notification(order_title, assigned_to):
-    """
-    根据分配对象决定通知方式
-    :param order_title: 订单标题
-    :param assigned_to: 分配给谁
-    """
-    # 商家后台链接 (用于通知) - 已从配置获取
-    merchant_url = MERCHANT_URL
+class OrderScanner:
+    def __init__(self):
+        self.config = {}
+        self.running = False
+        self.thread = None
+        self.stop_event = threading.Event()
+        self.load_config()
 
-    # --- 1. Webhook 通知 (内部群 - 支持多配置) ---
-    if WEBHOOK_CONFIGS:
-        for config in WEBHOOK_CONFIGS:
-            webhook_url = config.get("url")
-            targets = config.get("targets", [])
-            
-            # 检查是否匹配当前分配对象
-            # 如果 targets 包含 "*" 或为空列表，或者是当前分配对象，则发送
-            if not webhook_url:
-                continue
-                
-            if "*" in targets or not targets or assigned_to in targets:
-                try:
-                    # 构造通知内容
-                    if assigned_to == "米奇租赁官方":
-                        webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
-                    else:
-                        webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
-                        
-                    payload = {
-                        "msgtype": "text",
-                        "text": {
-                            "content": webhook_content
-                        }
-                    }
-                    resp = requests.post(webhook_url, json=payload)
-                    print(f"-> Webhook 通知已发送至 [{webhook_url[-6:]}...]，状态码: {resp.status_code}")
-                except Exception as e:
-                    print(f"-> Webhook 发送失败: {e}")
-
-    # --- 2. RPA 通知 (外部群 - 目前暂时禁用) ---
-    target_group = RPA_GROUP_MAPPING.get(assigned_to)
-    
-    if target_group:
-        # print(f"-> 分配给 [{assigned_to}]，触发 RPA 通知到群: [{target_group}]")
-        # 暂时注释掉 RPA 通知
-        # send_rpa_notification(order_title, assigned_to, target_group)
-        print(f"-> [调试] RPA 通知已暂时禁用 (目标群: {target_group})")
-    else:
-        # print(f"-> 分配给 [{assigned_to}]，无需 RPA 通知")
-        pass
-
-def send_rpa_notification(order_title, assigned_to, group_name):
-    """
-    执行 RPA 发送逻辑
-    """
-    try:
-        # 商家后台链接 - 已从配置获取
-        merchant_url = MERCHANT_URL
-
-        # 拟人化话术
-        if assigned_to == "星享生活":
-            content = f"老板，有新订单需要处理哈~ 辛苦处理下：\n{order_title}\n\n处理链接：{merchant_url}"
-        else:
-            # 默认话术
-            content = f"您好，有新订单分配给您，请及时处理：\n{order_title}\n\n处理链接：{merchant_url}"
-            
-        # 1. 查找企业微信窗口
-        wechat_window = auto.WindowControl(searchDepth=1, Name="企业微信")
-        if not wechat_window.Exists(0):
-            wechat_window = auto.WindowControl(searchDepth=1, ClassName="WeWorkWindow")
-            
-        if not wechat_window.Exists(0):
-            print("-> [错误] 未找到企业微信窗口，RPA通知发送失败！")
-            return
-            
-        # 2. 激活窗口并置顶
-        wechat_window.SetActive()
-        wechat_window.SetTopmost(True)
-        time.sleep(0.5)
-        
-        # 3. 搜索群聊
-        wechat_window.SendKeys('{Ctrl}f')
-        time.sleep(0.5)
-        
-        pyperclip.copy(group_name)
-        wechat_window.SendKeys('{Ctrl}v')
-        time.sleep(1.5) # 等待搜索结果
-        wechat_window.SendKeys('{Enter}') # 选中
-        time.sleep(0.5)
-        
-        # 4. 发送消息
-        pyperclip.copy(content)
-        wechat_window.SendKeys('{Ctrl}v')
-        time.sleep(0.5)
-        wechat_window.SendKeys('{Enter}') # 发送
-        
-        # 5. 恢复窗口状态
-        wechat_window.SetTopmost(False)
-        wechat_window.Minimize()
-        
-        print(f"-> RPA 通知已发送")
-        
-    except Exception as e:
-        print(f"-> RPA 发送通知时出错: {e}")
-
-def run():
-    with sync_playwright() as p:
-        # 启动浏览器，headless=False 表示显示浏览器窗口，方便手动登录
-        # args=["--window-position=-2400,-2400"] 将窗口移动到屏幕可视区域外
-        print("正在启动浏览器...")
-        browser = p.chromium.launch(headless=False, args=["--window-position=-2400,-2400"])
-        context = browser.new_context()
-        page = context.new_page()
-
-        print(f"正在访问: {URL}")
-        page.goto(URL)
-
-        # 尝试自动登录
-        if USERNAME and PASSWORD:
-            # 登录框 Selector
-            user_selector = "#form1 > div > div:nth-child(3) > input"
-            pass_selector = "#form1 > div > div:nth-child(4) > input"
-            
-            try:
-                # 检查是否在登录页（检查用户名输入框是否存在）
-                # 等待一小会儿，如果是跳转到登录页的话
-                try:
-                    page.wait_for_selector(user_selector, timeout=5000)
-                    print("检测到登录页面，开始自动登录...")
-                    
-                    # 输入账号
-                    page.fill(user_selector, USERNAME)
-                    # 输入密码
-                    page.fill(pass_selector, PASSWORD)
-                    
-                    # 提交登录 (在密码框按回车，通常能提交表单)
-                    print("提交登录信息...")
-                    page.press(pass_selector, "Enter")
-                    
-                    # 等待跳转
-                    page.wait_for_load_state("networkidle")
-                    
-                    # 登录后再次访问目标网址，防止停留在默认首页
-                    print("登录操作完成，正在跳转到目标页面...")
-                    page.goto(URL)
-                    page.wait_for_load_state("networkidle")
-
-                except:
-                    print("未检测到登录输入框，跳过自动登录（可能已登录或选择器不匹配）...")
-            except Exception as e:
-                print(f"自动登录尝试失败: {e}")
-
-        # 等待登录
-        print("请在浏览器中完成登录（如果需要）...")
-        print("注意：如果手动登录，登录后请确保跳转到订单列表页面...")
-        print(f"当前页面标题: {page.title()}")
-        print(f"当前页面URL: {page.url}")
+    def load_config(self):
+        config_path = "config.json"
+        if not os.path.exists(config_path):
+            log(f"错误: 找不到配置文件 {config_path}")
+            return False
         
         try:
-            # 增加调试信息：检查页面是否包含 iframe
-            frames = page.frames
-            print(f"检测到 {len(frames)} 个 frame (框架)")
-            
-            # 尝试等待页面加载完成
-            print("等待页面网络空闲...")
-            try:
-                page.wait_for_load_state("networkidle", timeout=5000)
-            except:
-                print("等待网络空闲超时，继续尝试查找元素...")
-
-            print("正在尝试定位 Tab 栏...")
-            # 尝试多种选择器
-            try:
-                # 优先尝试用户提供的 #myTab
-                page.wait_for_selector("#myTab", timeout=10000)
-                print("成功找到 #myTab")
-            except:
-                print("未找到 #myTab，尝试查找包含'待发货'或'待审核'的链接...")
-                # 尝试通过文本查找
-                if page.get_by_text("待发货").count() > 0 or page.get_by_text("待审核").count() > 0:
-                     print("通过文本找到了 Tab 相关的文字")
-                else:
-                     # 打印页面源码的前 1000 个字符帮助诊断
-                     print("未找到常见元素，页面源码前 500 字符:")
-                     print(page.content()[:500])
-                     
-                     # 再次尝试更通用的 body
-                     page.wait_for_selector("body", timeout=10000)
-                     print("找到了 body 元素，但未找到 Tab。可能是登录未成功或页面结构不同。")
-
-            # 无论上面是否找到，都尝试继续，或者抛出异常让外层捕获
-            # 这里恢复原来的 wait_for_selector，但放宽条件，只要能找到“待审核”或者 tab 都可以
-            print("最终确认：等待页面关键元素 (Tab 或 文本)...")
-            # 只要满足其中一个选择器即可
-            page.wait_for_selector("#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')", timeout=60000)
-
+            with open(config_path, 'r', encoding='utf-8') as f:
+                self.config = json.load(f)
+            log("配置已加载")
+            return True
         except Exception as e:
-            print("等待超时或出错，请检查是否已登录。")
+            log(f"读取配置文件失败: {e}")
+            return False
+
+    def get_config(self, key, default=None):
+        return self.config.get(key, default)
+
+    def start(self):
+        if self.running:
+            log("服务已经在运行中...")
+            return
+        
+        # Reload config before starting
+        self.load_config()
+        self.stop_event.clear()
+        self.running = True
+        self.thread = threading.Thread(target=self._run_loop)
+        self.thread.daemon = True
+        self.thread.start()
+        log("服务启动中...")
+
+    def stop(self):
+        if not self.running:
+            log("服务未运行")
+            return
+        
+        log("正在停止服务...")
+        self.stop_event.set()
+        # Wait a bit for the thread to finish cleanly, but don't block forever
+        self.running = False
+        # Thread will exit when it checks stop_event
+
+    def restart(self):
+        self.stop()
+        time.sleep(2) # Give it some time to shut down
+        self.start()
+
+    def send_notification(self, order_title, assigned_to):
+        merchant_url = self.get_config("merchant_url", "")
+        webhook_configs = self.get_config("webhook_configs", [])
+        rpa_group_mapping = self.get_config("rpa_group_mapping", {})
+
+        # 1. Webhook Notification
+        if webhook_configs:
+            for config in webhook_configs:
+                webhook_url = config.get("url")
+                targets = config.get("targets", [])
+                
+                if not webhook_url:
+                    continue
+                    
+                if "*" in targets or not targets or assigned_to in targets:
+                    try:
+                        if assigned_to == "米奇租赁官方":
+                            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
+                        else:
+                            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+                            
+                        payload = {
+                            "msgtype": "text",
+                            "text": {
+                                "content": webhook_content
+                            }
+                        }
+                        resp = requests.post(webhook_url, json=payload)
+                        log(f"-> Webhook 通知已发送至 [{webhook_url[-6:]}...]，状态码: {resp.status_code}")
+                    except Exception as e:
+                        log(f"-> Webhook 发送失败: {e}")
+
+        # 2. RPA Notification (Windows only)
+        target_group = rpa_group_mapping.get(assigned_to)
+        if target_group:
+            if sys.platform == 'win32' and HAS_UIAUTOMATION:
+                # self.send_rpa_notification(order_title, assigned_to, target_group)
+                log(f"-> [调试] RPA 通知已暂时禁用 (目标群: {target_group})")
+            else:
+                log(f"-> [提示] 跳过 RPA 通知 (非 Windows 环境或缺少依赖)")
+
+    def send_rpa_notification(self, order_title, assigned_to, group_name):
+        if not (sys.platform == 'win32' and HAS_UIAUTOMATION and HAS_PYPERCLIP):
+            log("无法发送 RPA 通知：环境不支持")
             return
 
-        print("检测到目标页面，开始执行自动化流程...")
-
-        while True:
-            print(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
-            
-            # 2. 检查待审核数量
-            # 尝试优先从 Tab 上获取数量，因为分页器在无数据时可能不存在
-            try:
-                # 检查 Tab 上的待审核数量 (如果有)
-                # 优先使用文本定位，比 CSS ID 更稳健
-                tab_locator = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
+        try:
+            merchant_url = self.get_config("merchant_url", "")
+            if assigned_to == "星享生活":
+                content = f"老板，有新订单需要处理哈~ 辛苦处理下：\n{order_title}\n\n处理链接：{merchant_url}"
+            else:
+                content = f"您好，有新订单分配给您，请及时处理：\n{order_title}\n\n处理链接：{merchant_url}"
                 
-                if tab_locator.count() > 0 and tab_locator.is_visible():
-                    tab_text = tab_locator.inner_text()
-                    # tab_text 可能是 "待审核(0)" 格式
-                    if "(" in tab_text and ")" in tab_text:
-                        import re
-                        match = re.search(r"\((\d+)\)", tab_text)
-                        if match:
-                            count_val = int(match.group(1))
-                            print(f"Tab 显示待审核数量: {count_val}")
-                            if count_val == 0:
-                                print("待审核数量为 0，等待 30 秒后重试...")
-                                time.sleep(30)
-                                print("正在刷新页面...")
-                                try:
-                                    page.reload(timeout=60000)
-                                    page.wait_for_load_state("networkidle", timeout=60000)
-                                except Exception as e:
-                                    print(f"刷新页面超时或失败 (已忽略): {e}")
-                                continue
-            except Exception as e:
-                print(f"检查 Tab 数量出错: {e}，继续尝试其他方式...")
+            wechat_window = auto.WindowControl(searchDepth=1, Name="企业微信")
+            if not wechat_window.Exists(0):
+                wechat_window = auto.WindowControl(searchDepth=1, ClassName="WeWorkWindow")
+                
+            if not wechat_window.Exists(0):
+                log("-> [错误] 未找到企业微信窗口，RPA通知发送失败！")
+                return
+                
+            wechat_window.SetActive()
+            wechat_window.SetTopmost(True)
+            time.sleep(0.5)
+            
+            wechat_window.SendKeys('{Ctrl}f')
+            time.sleep(0.5)
+            
+            pyperclip.copy(group_name)
+            wechat_window.SendKeys('{Ctrl}v')
+            time.sleep(1.5)
+            wechat_window.SendKeys('{Enter}')
+            time.sleep(0.5)
+            
+            pyperclip.copy(content)
+            wechat_window.SendKeys('{Ctrl}v')
+            time.sleep(0.5)
+            wechat_window.SendKeys('{Enter}')
+            
+            wechat_window.SetTopmost(False)
+            wechat_window.Minimize()
+            
+            log(f"-> RPA 通知已发送")
+            
+        except Exception as e:
+            log(f"-> RPA 发送通知时出错: {e}")
 
-            # 原有的分页器检查逻辑 (作为备份)
-            count_selector = "#pagination > div > ul > li > span"
-            try:
-                # 尝试获取数量
-                if page.locator(count_selector).is_visible():
-                    count_text = page.locator(count_selector).inner_text().strip()
-                    print(f"分页器显示数量: {count_text}")
-                    if count_text == "0":
-                        print("待处理数量为 0，等待 30 秒后重试...")
-                        time.sleep(30) # 等待 30 秒
-                        # 刷新页面以获取最新数据
-                        print("正在刷新页面...")
+    def _run_loop(self):
+        url = self.get_config("url", "")
+        username = self.get_config("username", "")
+        password = self.get_config("password", "")
+        keyword_mapping = self.get_config("keyword_mapping", {})
+        scan_interval = self.get_config("scan_interval", 30)
+        headless = self.get_config("headless", True)
+
+        log(f"启动浏览器... (Headless: {headless})")
+        
+        try:
+            with sync_playwright() as p:
+                args = ["--window-position=-2400,-2400"] if not headless else []
+                browser = p.chromium.launch(headless=headless, args=args)
+                context = browser.new_context()
+                page = context.new_page()
+
+                log(f"正在访问: {url}")
+                try:
+                    page.goto(url)
+                except Exception as e:
+                    log(f"访问 URL 失败: {e}")
+                    return
+
+                # Auto Login
+                if username and password:
+                    user_selector = "#form1 > div > div:nth-child(3) > input"
+                    pass_selector = "#form1 > div > div:nth-child(4) > input"
+                    try:
+                        try:
+                            page.wait_for_selector(user_selector, timeout=5000)
+                            log("检测到登录页面，开始自动登录...")
+                            page.fill(user_selector, username)
+                            page.fill(pass_selector, password)
+                            page.press(pass_selector, "Enter")
+                            page.wait_for_load_state("networkidle")
+                            log("登录操作完成，正在跳转到目标页面...")
+                            page.goto(url)
+                            page.wait_for_load_state("networkidle")
+                        except:
+                            log("未检测到登录输入框，跳过自动登录...")
+                    except Exception as e:
+                        log(f"自动登录尝试失败: {e}")
+
+                if not headless:
+                    log("请在浏览器中完成登录（如果需要）...")
+                
+                try:
+                    log("等待页面关键元素...")
+                    page.wait_for_selector("#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')", timeout=60000)
+                except Exception as e:
+                    log("等待超时或出错，请检查是否已登录。")
+                    browser.close()
+                    self.running = False
+                    return
+
+                log("检测到目标页面，开始执行自动化流程...")
+
+                while not self.stop_event.is_set():
+                    log(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
+                    
+                    # 1. Check Count
+                    found_count = False
+                    try:
+                        tab_locator = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
+                        if tab_locator.count() > 0 and tab_locator.is_visible():
+                            tab_text = tab_locator.inner_text()
+                            if "(" in tab_text and ")" in tab_text:
+                                import re
+                                match = re.search(r"\((\d+)\)", tab_text)
+                                if match:
+                                    count_val = int(match.group(1))
+                                    log(f"Tab 显示待审核数量: {count_val}")
+                                    if count_val == 0:
+                                        found_count = True
+                    except Exception as e:
+                        log(f"检查 Tab 数量出错: {e}")
+
+                    if not found_count:
+                         # Fallback to pagination count
+                        count_selector = "#pagination > div > ul > li > span"
+                        try:
+                            if page.locator(count_selector).is_visible():
+                                count_text = page.locator(count_selector).inner_text().strip()
+                                log(f"分页器显示数量: {count_text}")
+                                if count_text == "0":
+                                    found_count = True
+                        except:
+                            pass
+
+                    if found_count:
+                        log(f"待审核数量为 0，等待 {scan_interval} 秒后重试...")
+                        time.sleep(scan_interval)
+                        log("正在刷新页面...")
                         try:
                             page.reload(timeout=60000)
                             page.wait_for_load_state("networkidle", timeout=60000)
-                        except Exception as e:
-                            print(f"刷新页面超时或失败 (已忽略): {e}")
-                        # 刷新后重新进入循环检查
-                        continue
-                else:
-                     # print("未找到数量统计元素，假设有数据继续执行...")
-                     pass
-            except Exception as e:
-                print(f"获取待处理数量失败: {e}，继续尝试执行...")
-
-            # 1. 点击 Tab
-            # 优化：检查是否已经激活，避免重复点击；只点击可见元素
-            try:
-                # 使用文本定位 "待审核"
-                target_link = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
-                
-                is_active = False
-                try:
-                    # 获取可见的 Tab 链接
-                    if target_link.count() > 0 and target_link.is_visible():
-                        # 检查 a 标签的 class
-                        a_class = target_link.get_attribute("class")
-                        
-                        # 检查父元素 li 的 class (通常 Tab 结构是 ul > li > a)
-                        li_class = ""
-                        try:
-                            parent_li = target_link.locator("xpath=..")
-                            li_class = parent_li.get_attribute("class")
                         except:
                             pass
-                        
-                        # 只要有一个包含 active，就认为是激活状态
-                        if (li_class and "active" in li_class) or (a_class and "active" in a_class):
-                            is_active = True
-                    else:
-                        print("未找到可见的 '待审核' 链接。")
-                except Exception as e:
-                    print(f"检查 Tab 状态时出错: {e}")
-                    pass
+                        continue
 
-                if not is_active:
-                    if target_link.count() > 0:
-                        print("点击 '待审' Tab...")
-                        target_link.click()
-                        page.wait_for_load_state("networkidle")
-                        time.sleep(2)
-                    else:
-                         print("无法点击 Tab: 未找到目标元素")
-                else:
-                    print("当前已在 '待审' Tab，无需点击。")
-            except Exception as e:
-                print(f"点击 Tab 操作异常: {e}")
-                # 如果点击失败，不要退出，尝试直接处理列表（也许已经在这个页面了）
-    
-    
-            # --- 遍历列表寻找符合条件的订单 ---
-            # 列表容器: #table > div > div > div
-            # 列表项: > div (从第4个开始是订单，前3个可能是表头或其他)
-            
-            container_selector = "#table > div > div > div"
-            items_locator = page.locator(f"{container_selector} > div")
-            items_count = items_locator.count()
-            
-            print(f"当前页面列表项总数: {items_count}")
-            
-            processed_order = False
-            
-            # 从第4个子元素开始遍历 (Playwright 索引从 0 开始，nth-child 从 1 开始)
-            # nth-child(4) 对应索引 3
-            start_index = 3 
-            
-            for i in range(start_index, items_count):
-                # 构建当前项的选择器
-                # nth-child 是 1-based，所以是 i + 1
-                current_item_selector = f"{container_selector} > div:nth-child({i + 1})"
-                
-                # 检查商户名称
-                # Selector: ... > div.table-row.table-top > div > span:nth-child(3)
-                merchant_selector = f"{current_item_selector} > div.table-row.table-top > div > span:nth-child(3)"
-                
-                try:
-                    if not page.locator(merchant_selector).is_visible():
-                        # 可能是分隔线或者非订单行，跳过
-                        continue
-                        
-                    merchant_name = page.locator(merchant_selector).inner_text().strip()
-                    # 清理 "商户名称：" 前缀
-                    merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
-                    print(f"检查第 {i - 2} 个订单，商户名称: [{merchant_name}] -> 清理后: [{merchant_name_clean}]")
-                    
-                    if merchant_name_clean != "米奇租赁":
-                        print(f"-> 商户[{merchant_name_clean}]不是'米奇租赁'，不需要分配，跳过。")
-                        continue
-                    
-                    print("-> 商户匹配，开始处理此订单...")
-                    item_selector = current_item_selector
-                    
-                    # 3. 分析它的文本
-                    # Selector: ... > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary
-                    text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
-                    
+                    # 2. Click Tab
                     try:
-                        print("正在获取文本内容...")
-                        text_element = page.locator(text_selector)
-                        text_content = text_element.inner_text()
-                        print(f"获取到的文本内容: {text_content}")
-                    except Exception as e:
-                        print(f"获取文本失败: {e}")
-                        # 如果获取文本失败，可能结构不一样，跳过这个
-                        continue
-            
-                    # 4. 检查是否包含指定关键词
-                    # 默认分配给 "米奇租赁官方"
-                    target_option = "米奇租赁官方"
-                    matched_info = "默认规则 (无匹配关键词)"
-                    
-                    for keyword, option in KEYWORD_MAPPING.items():
-                        if keyword in text_content:
-                            target_option = option
-                            matched_info = f"关键词匹配: {keyword}"
-                            break
-                    
-                    print(f"匹配结果: [{matched_info}] -> 分配给: [{target_option}]")
-                    
-                    # 5. 点击操作按钮
-                    # 策略升级：由于不同订单的“分配”按钮可能在第7列或第8列，使用 CSS 选择器定位列数不可靠。
-                    # 最稳健的方式是：在当前订单行（item_selector）内部，查找包含“分配”文字的按钮/链接。
-            
-                    try:
-                        print("点击操作按钮...")
-                        # 在当前行内查找文本包含 "分配" 的 <a> 标签
-                        # 这样无论它在第几列，只要文字没变都能找到
-                        assign_btn = page.locator(item_selector).locator("a:has-text('分配')")
-                        
-                        if assign_btn.count() > 0:
-                            # 如果有多个（比如“分配”和“取消分配”），默认点第一个，通常是“分配订单”
-                            # 或者可以更精确匹配 "分配订单"
-                            assign_btn.first.click()
-                        else:
-                            # 如果找不到 "分配"，尝试找 "订单" 相关的按钮作为兜底，或者打印错误
-                            print("未找到'分配'按钮，尝试查找通用操作按钮...")
-                            # 此时可能需要回退到位置点击，或者跳过
-                            # 这里尝试打印当前行的 html 方便调试（如果需要）
-                            print("当前行未检测到分配按钮，跳过此订单。")
-                            continue
-                        
-                        time.sleep(1) # 等待弹窗或界面变化
-                    except Exception as e:
-                        print(f"点击操作按钮失败: {e}")
-                        # 点击失败可能这个订单有问题，跳过
-                        continue
-        
-                    # 6. 点击下拉组件
-                    # Selector: #select2-chosen-2
-                    dropdown_selector = "#select2-chosen-2"
-                    
-                    try:
-                        print("点击下拉组件...")
-                        page.click(dropdown_selector)
-                        time.sleep(0.5)
-                    except Exception as e:
-                        print(f"点击下拉组件失败: {e}")
-                        # 弹窗可能没出来或者选择器变了
-                        # 尝试关闭弹窗（如果有）并继续下一个？
-                        # 这里简单处理：刷新页面重试
-                        processed_order = True # 标记为处理过（虽然失败），触发刷新
-                        break # 点击下拉失败，跳出循环刷新
-        
-                    # 7. 选择对应关键词对应的下拉选项
-                    try:
-                        print(f"选择下拉选项: {target_option}")
-                        # 策略 A: 键盘输入 + 回车
-                        page.keyboard.type(target_option)
-                        time.sleep(0.5)
-                        page.keyboard.press("Enter")
-                        time.sleep(0.5)
-        
-                        # 策略 B: 点击
-                        opt_v4 = page.locator(f"li.select2-results__option:has-text('{target_option}')")
-                        opt_v3 = page.locator(f"div.select2-result-label:has-text('{target_option}')")
-                        
-                        if opt_v4.is_visible():
-                            opt_v4.last.click()
-                        elif opt_v3.is_visible():
-                            opt_v3.last.click()
-                        
-                        time.sleep(0.5)
-                    except Exception as e:
-                        print(f"选择下拉选项失败: {e}")
-                        processed_order = True
-                        break # 下拉选择失败，可能是弹窗问题，跳出循环刷新
-        
-                    # 8. 点击确认按钮
-                    confirm_btn_selector = "#ajaxModal > form > div > div > div.modal-footer > button.btn.btn-primary"
-                    
-                    try:
-                        print("准备点击确认按钮...")
-                        # 显式等待按钮出现，防止弹窗还没加载出来
-                        # 尝试等待 2 秒
+                        target_link = page.locator("a:has-text('待审核')").filter(has=page.locator("visible=true")).first
+                        is_active = False
                         try:
-                            page.wait_for_selector(confirm_btn_selector, state="visible", timeout=3000)
-                            print("找到确认按钮，点击中...")
-                            page.click(confirm_btn_selector)
+                            if target_link.count() > 0 and target_link.is_visible():
+                                a_class = target_link.get_attribute("class")
+                                parent_li = target_link.locator("xpath=..")
+                                li_class = parent_li.get_attribute("class")
+                                if (li_class and "active" in li_class) or (a_class and "active" in a_class):
+                                    is_active = True
                         except:
-                            print("标准确认按钮未出现或超时，尝试使用文字定位...")
-                            # 尝试找包含 "提交" 或 "确定" 的按钮
-                            # 缩小范围到 modal footer
-                            modal_footer = page.locator("#ajaxModal .modal-footer")
-                            if modal_footer.count() > 0:
-                                modal_footer.locator("button").first.click()
-                            else:
-                                # 全局找
-                                page.locator("button:has-text('提交')").click()
-                        
-                        print("订单提交动作已执行！")
-                        
-                        # 发送通知
-                        send_notification(text_content, target_option)
+                            pass
 
-                        # 等待一下看弹窗是否关闭，确认提交成功
-                        time.sleep(2)
-                        
-                        processed_order = True
-                        # break # 修改策略：不跳出循环，继续处理下一个
-                        print("继续检查下一个订单...")
-                        time.sleep(1) # 稍作等待，防止操作太快
-                        
+                        if not is_active and target_link.count() > 0:
+                            log("点击 '待审' Tab...")
+                            target_link.click()
+                            page.wait_for_load_state("networkidle")
+                            time.sleep(2)
                     except Exception as e:
-                        print(f"点击确认按钮失败: {e}")
-                        processed_order = True # 即使失败也刷新一下，防止死循环在同一个状态
-                        break # 出错了就先跳出吧，稳妥起见
+                        log(f"点击 Tab 操作异常: {e}")
 
-                except Exception as e:
-                    print(f"遍历检查订单时出错: {e}")
-                    continue
+                    # 3. Process List
+                    container_selector = "#table > div > div > div"
+                    items_locator = page.locator(f"{container_selector} > div")
+                    items_count = items_locator.count()
+                    log(f"当前页面列表项总数: {items_count}")
+                    
+                    start_index = 3
+                    for i in range(start_index, items_count):
+                        if self.stop_event.is_set():
+                            break
 
-            if processed_order:
-                print("本轮循环已处理过订单，等待 3 秒后刷新页面...")
-                time.sleep(3)
-                try:
-                    page.reload(timeout=60000)
-                    page.wait_for_load_state("networkidle", timeout=60000)
-                except Exception as e:
-                    print(f"刷新页面超时或失败 (已忽略): {e}")
-            else:
-                print("当前列表中没有符合条件（商户为'米奇租赁'）的订单。")
-                print("等待 30 秒后重试...")
-                time.sleep(30)
-                try:
-                    print("正在刷新页面...")
-                    page.reload(timeout=60000)
-                    page.wait_for_load_state("networkidle", timeout=60000)
-                except Exception as e:
-                    print(f"刷新页面超时或失败 (已忽略): {e}")
+                        current_item_selector = f"{container_selector} > div:nth-child({i + 1})"
+                        merchant_selector = f"{current_item_selector} > div.table-row.table-top > div > span:nth-child(3)"
+                        
+                        try:
+                            if not page.locator(merchant_selector).is_visible():
+                                continue
+                                
+                            merchant_name = page.locator(merchant_selector).inner_text().strip()
+                            merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
+                            
+                            if merchant_name_clean != "米奇租赁":
+                                continue
+                            
+                            log(f"-> 发现米奇租赁订单...")
+                            item_selector = current_item_selector
+                            text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
+                            
+                            text_content = ""
+                            try:
+                                text_element = page.locator(text_selector)
+                                text_content = text_element.inner_text()
+                                log(f"订单内容: {text_content}")
+                            except:
+                                log("获取订单内容失败")
+                                continue
+            
+                            target_option = "米奇租赁官方"
+                            matched_info = "默认规则"
+                            
+                            for keyword, option in keyword_mapping.items():
+                                if keyword in text_content:
+                                    target_option = option
+                                    matched_info = f"关键词匹配: {keyword}"
+                                    break
+                            
+                            log(f"匹配结果: [{matched_info}] -> 分配给: [{target_option}]")
+                            
+                            # Assign
+                            try:
+                                assign_btn = page.locator(item_selector).locator("a:has-text('分配')")
+                                if assign_btn.count() > 0:
+                                    # Perform click - CAREFUL: this is live action
+                                    # assign_btn.first.click()
+                                    # log("已点击分配按钮 (模拟)") 
+                                    
+                                    # Send Notification
+                                    self.send_notification(text_content, target_option)
+                                else:
+                                    log("未找到分配按钮")
+                            except Exception as e:
+                                log(f"点击分配按钮失败: {e}")
 
-        # 保持浏览器开启一段时间以便查看结果 (这句在死循环后实际上达不到)
+                        except Exception as e:
+                            log(f"处理订单行出错: {e}")
+                    
+                    # Wait for next scan
+                    if not self.stop_event.is_set():
+                        log(f"本轮结束，等待 {scan_interval} 秒...")
+                        time.sleep(scan_interval)
+                        try:
+                            page.reload()
+                            page.wait_for_load_state("networkidle")
+                        except:
+                            pass
 
-        # 保持浏览器开启一段时间以便查看结果 (这句在死循环后实际上达不到)
-        # print("脚本执行完毕，浏览器将在 10 秒后关闭...")
-        # time.sleep(10)
-        # browser.close()
+                browser.close()
+                log("浏览器已关闭")
 
+        except Exception as e:
+            log(f"运行过程中发生严重错误: {e}")
+        finally:
+            self.running = False
+            log("服务已停止")
+
+# Singleton instance
+scanner = OrderScanner()
 
 if __name__ == "__main__":
-    run()
+    scanner.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        scanner.stop()
