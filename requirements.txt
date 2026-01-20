@@ -1,4 +1,4 @@
-playwright
+playwright==1.57.0
 requests
 flask
 # uiautomation # Windows only, commented out for Docker compatibility
