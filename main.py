@@ -192,7 +192,7 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                args = ["--window-position=-2400,-2400"] if not headless else []
+                args = ["--window-position=0,0"] if not headless else []
                 browser = p.chromium.launch(headless=headless, args=args)
                 context = browser.new_context()
                 page = context.new_page()
@@ -353,14 +353,55 @@ class OrderScanner:
                             
                             # Assign
                             try:
-                                assign_btn = page.locator(item_selector).locator("a:has-text('分配')")
+                                # Try to find the assign button using specific column or text
+                                assign_btn = page.locator(item_selector).locator("div:nth-child(8) a").filter(has_text="分配")
+                                
                                 if assign_btn.count() > 0:
-                                    # Perform click - CAREFUL: this is live action
-                                    # assign_btn.first.click()
-                                    # log("已点击分配按钮 (模拟)") 
+                                    log("点击分配按钮...")
+                                    assign_btn.first.click()
                                     
-                                    # Send Notification
-                                    self.send_notification(text_content, target_option)
+                                    # Handle Modal
+                                    try:
+                                        # Wait for modal to appear
+                                        page.wait_for_selector(".modal", timeout=5000)
+                                        
+                                        # Click dropdown
+                                        # Try user provided ID first, then fallback to generic class
+                                        dropdown = page.locator("#select2-chosen-2")
+                                        if not dropdown.is_visible():
+                                            dropdown = page.locator(".select2-choice, .select2-selection").filter(has=page.locator("visible=true")).first
+                                        
+                                        log("点击商户下拉框...")
+                                        dropdown.click()
+                                        
+                                        # Type merchant name in search box
+                                        # Select2 search box usually is appended to body
+                                        search_input = page.locator(".select2-search__field, input.select2-input").filter(has=page.locator("visible=true"))
+                                        search_input.wait_for(timeout=5000)
+                                        
+                                        log(f"输入商户名称: {target_option}")
+                                        search_input.fill(target_option)
+                                        time.sleep(1) # Wait for search results
+                                        search_input.press("Enter")
+                                        
+                                        # Click Confirm
+                                        log("点击确定按钮...")
+                                        confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
+                                        confirm_btn.click()
+                                        
+                                        log("分配操作提交完成")
+                                        
+                                        # Send Notification
+                                        self.send_notification(text_content, target_option)
+                                        
+                                        # Wait for modal to close
+                                        time.sleep(2)
+                                        
+                                    except Exception as e:
+                                        log(f"分配弹窗操作失败: {e}")
+                                        # Try to close modal if stuck?
+                                        page.keyboard.press("Escape")
+
                                 else:
                                     log("未找到分配按钮")
                             except Exception as e:
