@@ -386,11 +386,29 @@ class OrderScanner:
                                         
                                         # Click Confirm
                                         log("点击确定按钮...")
-                                        confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
-                                        confirm_btn.click()
-                                        
-                                        log("分配操作提交完成")
-                                        
+                                        try:
+                                            # Scope to the visible modal
+                                            visible_modal = page.locator(".modal").filter(has=page.locator("visible=true"))
+                                            if visible_modal.count() > 0:
+                                                confirm_btn = visible_modal.locator("button.btn-primary, button:has-text('确定'), button:has-text('确认'), input[value='确定'], input[value='确认']").first
+                                                if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                                                    confirm_btn.click()
+                                                    log("分配操作提交完成")
+                                                else:
+                                                    log("在弹窗中未找到确定按钮")
+                                                    # Log visible buttons for debugging
+                                                    buttons = visible_modal.locator("button, input[type='button'], input[type='submit']").all_inner_texts()
+                                                    log(f"弹窗内可见按钮: {buttons}")
+                                                    raise Exception("未找到确定按钮")
+                                            else:
+                                                 # Fallback to global search if modal structure is different
+                                                confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
+                                                confirm_btn.click()
+                                                log("分配操作提交完成 (Fallback)")
+                                        except Exception as e:
+                                            log(f"点击确定按钮失败: {e}")
+                                            raise e
+
                                         # Send Notification
                                         self.send_notification(text_content, target_option)
                                         
