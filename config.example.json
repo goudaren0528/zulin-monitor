@@ -1,32 +1,69 @@
 {
-    "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
-    "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
-    "username": "YOUR_USERNAME_HERE",
-    "password": "YOUR_PASSWORD_HERE",
-    "webhook_configs": [
-        {
-            "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY_HERE",
-            "targets": ["*"]
-        }
-    ],
-    "rpa_group_mapping": {
-        "星享生活": "星享生活米奇支付宝入驻"
+    "common": {
+        "username": "YOUR_USERNAME_HERE",
+        "password": "YOUR_PASSWORD_HERE",
+        "headless": true
     },
-    "keyword_mapping": {
-        "G7X3": "星享生活",
-        "佳能ixus130": "米奇租赁官方"
+    "order_scanner": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "scan_interval": 60,
+        "keyword_mapping": {
+            "G7X2": "星享生活",
+            "G7X3": "星享生活",
+            "Galaxy S23Ultra": "米奇租赁官方",
+            "RF100-400mm": "星享生活",
+            "SQ1": "星享生活",
+            "SX740": "米奇租赁官方",
+            "Ulike": "米奇租赁官方",
+            "X200": "米奇租赁官方",
+            "X300": "米奇租赁官方",
+            "action4": "米奇租赁官方",
+            "action5": "米奇租赁官方",
+            "mini11": "米奇租赁官方",
+            "mini12": "米奇租赁官方",
+            "mini40": "星享生活",
+            "mini90": "星享生活",
+            "mini99": "星享生活",
+            "wide": "米奇租赁官方",
+            "佳能 R50": "星享生活",
+            "佳能 RF50m": "星享生活",
+            "佳能RF-S 18-150": "星享生活",
+            "佳能RF-S 55-210": "星享生活",
+            "佳能ixus130": "米奇租赁官方",
+            "尼康": "星享生活",
+            "松下": "星享生活"
+        },
+        "rpa_group_mapping": {
+            "星享生活": "星享生活米奇支付宝入驻"
+        },
+        "webhook_configs": [
+            {
+                "targets": [
+                    "*"
+                ],
+                "url": "YOUR_WEBHOOK_URL_HERE"
+            },
+            {
+                "targets": [
+                    "米奇租赁官方"
+                ],
+                "url": "YOUR_WEBHOOK_URL_HERE"
+            }
+        ]
     },
-    "scan_interval": 60,
-    "headless": true,
-    "monitor_config": {
+    "interface_monitor": {
         "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log",
-        "scan_interval": 300,
-        "webhook_url": "YOUR_MONITOR_WEBHOOK_URL",
-        "headless": true,
+        "scan_interval": 7200,
+        "webhook_url": "YOUR_WEBHOOK_URL_HERE",
+        "headless": false,
         "items": [
-            { "name": "百融风控", "threshold": 100 },
             { "name": "E签宝静默签人脸", "threshold": 100 },
-            { "name": "短信发送", "threshold": 100 }
+            { "name": "E签宝静默签合同", "threshold": 100 },
+            { "name": "E签宝静默签商家授权", "threshold": 10 },
+            { "name": "短信发送", "threshold": 200 },
+            { "name": "OCR识别", "threshold": 200 },
+            { "name": "百融风控", "threshold": 100 }
         ]
     }
 }

@@ -47,7 +47,13 @@ class OrderScanner:
         
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
+                raw_config = json.load(f)
+            
+            # Merge common config and order_scanner config
+            common_config = raw_config.get("common", {})
+            order_config = raw_config.get("order_scanner", {})
+            self.config = {**common_config, **order_config}
+            
             log("配置已加载")
             return True
         except Exception as e:

@@ -34,7 +34,12 @@ class InterfaceMonitor:
         
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
+                raw_config = json.load(f)
+            
+            common_config = raw_config.get("common", {})
+            monitor_config = raw_config.get("interface_monitor", {})
+            self.config = {**common_config, **monitor_config}
+            
             monitor_log("监控配置已加载")
             return True
         except Exception as e:
@@ -73,8 +78,7 @@ class InterfaceMonitor:
         self.start()
 
     def send_notification(self, content):
-        monitor_config = self.get_config("monitor_config", {})
-        webhook_url = monitor_config.get("webhook_url")
+        webhook_url = self.get_config("webhook_url")
         
         if not webhook_url:
             monitor_log("未配置 Webhook URL，无法发送通知")
@@ -84,7 +88,7 @@ class InterfaceMonitor:
             payload = {
                 "msgtype": "text",
                 "text": {
-                    "content": f"【测试测试测试接口余额告警】\n{content}"
+                    "content": f"【接口余额告警】\n{content}"
                 }
             }
             resp = requests.post(webhook_url, json=payload)
@@ -99,13 +103,9 @@ class InterfaceMonitor:
         headless = self.get_config("headless", True)
         
         # Monitor specific config
-        monitor_config = self.get_config("monitor_config", {})
-        target_url = monitor_config.get("url", "")
-        scan_interval = monitor_config.get("scan_interval", 300)
-        threshold = monitor_config.get("threshold", 100)
-        # Allow monitor-specific headless override, default to global headless setting
-        headless = monitor_config.get("headless", self.get_config("headless", True))
-
+        target_url = self.get_config("url", "")
+        scan_interval = self.get_config("scan_interval", 300)
+        
         monitor_log(f"启动监控浏览器... (Headless: {headless})")
         
         try:
@@ -168,7 +168,7 @@ class InterfaceMonitor:
                             continue
 
                         # Config Items
-                        monitor_items = monitor_config.get("items", [])
+                        monitor_items = self.get_config("items", [])
                         target_items_map = {item["name"]: item.get("threshold", 100) for item in monitor_items}
 
                         # Robust parsing strategy: Find all 'Available' labels and trace back to their card containers
