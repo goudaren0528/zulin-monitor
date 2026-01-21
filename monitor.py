@@ -167,7 +167,14 @@ class InterfaceMonitor:
                                 monitor_log("警告: 未检测到'可用条数'文本，可能是页面加载慢或无数据")
                         except:
                             monitor_log("等待监控元素超时，尝试刷新页面...")
-                            page.reload()
+                            try:
+                                page.reload()
+                                page.wait_for_load_state("networkidle", timeout=30000)
+                            except Exception as reload_e:
+                                monitor_log(f"刷新页面失败: {reload_e}")
+                            
+                            monitor_log("等待 30 秒后重试...")
+                            time.sleep(30)
                             continue
 
                         # Config Items
