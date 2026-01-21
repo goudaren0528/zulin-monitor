@@ -44,6 +44,9 @@
                 <button class="nav-link" id="monitor-tab" data-bs-toggle="tab" data-bs-target="#monitor" type="button" role="tab">💰 接口余额监控</button>
             </li>
             <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sync-tab" data-bs-toggle="tab" data-bs-target="#sync" type="button" role="tab">🔄 订单状态同步</button>
+            </li>
+            <li class="nav-item" role="presentation">
                 <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">⚙️ 全局配置</button>
             </li>
         </ul>
@@ -121,6 +124,42 @@
                 </div>
             </div>
 
+            <!-- Sync Tab -->
+            <div class="tab-pane fade" id="sync" role="tabpanel">
+                <div class="row mb-3">
+                    <div class="col-md-12">
+                        <div class="card shadow-sm">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h5 class="card-title d-inline-block me-3">同步控制</h5>
+                                    <div class="d-inline-block">
+                                        <span id="sync-status-dot" class="status-dot"></span>
+                                        <span id="sync-status-text" class="fw-bold text-muted">未知状态</span>
+                                    </div>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button onclick="controlService('/api/sync/control', 'start')" class="btn btn-success">启动同步</button>
+                                    <button onclick="controlService('/api/sync/control', 'stop')" class="btn btn-danger">停止同步</button>
+                                    <button onclick="controlService('/api/sync/control', 'restart')" class="btn btn-warning">重启同步</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>同步日志</span>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="syncAutoScroll" checked>
+                            <label class="form-check-label" for="syncAutoScroll">自动滚动</label>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div id="sync-log-container" class="log-container">正在获取日志...</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Config Tab -->
             <div class="tab-pane fade" id="config" role="tabpanel">
                 <div class="card shadow-sm h-100">
@@ -162,6 +201,13 @@
                 .then(response => response.json())
                 .then(data => {
                     updateStatusUI('monitor', data);
+                });
+
+            // Update Sync Status
+            fetch('/api/sync/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusUI('sync', data);
                 });
         }
 

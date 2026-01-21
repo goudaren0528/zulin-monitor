@@ -309,6 +309,7 @@ class OrderScanner:
                     items_count = items_locator.count()
                     log(f"当前页面列表项总数: {items_count}")
                     
+                    processed_count = 0
                     start_index = 3
                     for i in range(start_index, items_count):
                         if self.stop_event.is_set():
@@ -325,9 +326,10 @@ class OrderScanner:
                             merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
                             
                             if merchant_name_clean != "米奇租赁":
+                                # log(f"跳过商户: {merchant_name_clean}")
                                 continue
                             
-                            log(f"-> 发现米奇租赁订单...")
+                            log(f"-> 发现米奇租赁订单 (索引: {i})...")
                             item_selector = current_item_selector
                             text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
                             
@@ -354,11 +356,22 @@ class OrderScanner:
                             # Assign
                             try:
                                 # Try to find the assign button using specific column or text
-                                assign_btn = page.locator(item_selector).locator("div:nth-child(8) a").filter(has_text="分配")
+                                # User reported it's in nth-child(7), but we use a more robust search for "分配" text within the row
+                                assign_btn = page.locator(item_selector).locator("a").filter(has_text="分配")
                                 
+                                if assign_btn.count() == 0:
+                                    # Fallback: try "订单分配"
+                                    assign_btn = page.locator(item_selector).locator("a").filter(has_text="订单分配")
+
                                 if assign_btn.count() > 0:
                                     log("点击分配按钮...")
-                                    assign_btn.first.click()
+                                    # Ensure we click the visible one if multiple
+                                    btn_to_click = assign_btn.filter(has=page.locator("visible=true")).first
+                                    if btn_to_click.count() > 0:
+                                        btn_to_click.click()
+                                    else:
+                                        log("找到分配按钮但不加见，尝试强制点击第一个")
+                                        assign_btn.first.click()
                                     
                                     # Handle Modal
                                     try:
@@ -415,13 +428,21 @@ class OrderScanner:
                                         # Wait for modal to close
                                         time.sleep(2)
                                         
+                                        # Mark as processed and break to refresh page (safer to avoid stale elements)
+                                        processed_count += 1
+                                        break
+                                        
                                     except Exception as e:
                                         log(f"分配弹窗操作失败: {e}")
                                         # Try to close modal if stuck?
-                                        page.keyboard.press("Escape")
-
                                 else:
                                     log("未找到分配按钮")
+                                    # Debug: print available links in the row
+                                    try:
+                                        links = page.locator(item_selector).locator("a").all_inner_texts()
+                                        log(f"当前行可用链接: {links}")
+                                    except:
+                                        pass
                             except Exception as e:
                                 log(f"点击分配按钮失败: {e}")
 
@@ -430,8 +451,13 @@ class OrderScanner:
                     
                     # Wait for next scan
                     if not self.stop_event.is_set():
-                        log(f"本轮结束，等待 {scan_interval} 秒...")
-                        time.sleep(scan_interval)
+                        if processed_count > 0:
+                            log(f"本轮已处理 {processed_count} 个订单，立即刷新页面继续...")
+                            time.sleep(2)
+                        else:
+                            log(f"本轮结束，等待 {scan_interval} 秒...")
+                            time.sleep(scan_interval)
+                        
                         try:
                             page.reload()
                             page.wait_for_load_state("networkidle")

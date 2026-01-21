@@ -3,6 +3,7 @@ import os
 import json
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
+from sync_orders import order_sync, SYNC_LOG_BUFFER
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
@@ -58,6 +59,30 @@ def control_monitor():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# --- Sync API ---
+@app.route('/api/sync/status')
+def get_sync_status():
+    return jsonify({
+        'running': order_sync.running,
+        'logs': SYNC_LOG_BUFFER[-50:]
+    })
+
+@app.route('/api/sync/control', methods=['POST'])
+def control_sync():
+    action = request.json.get('action')
+    try:
+        if action == 'start':
+            order_sync.start()
+        elif action == 'stop':
+            order_sync.stop()
+        elif action == 'restart':
+            order_sync.restart()
+        else:
+            return jsonify({'status': 'error', 'message': '无效的操作'}), 400
+        return jsonify({'status': 'success', 'message': f'同步服务已执行操作: {action}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 # --- Shared Config API ---
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
@@ -79,6 +104,9 @@ def handle_config():
         except Exception as e:
             return jsonify({'status': 'error', 'message': str(e)}), 400
 
+# --- Mock External API ---
+# (Removed: External API should be implemented in the Next.js project on port 3000)
+
 if __name__ == '__main__':
     # Listen on all interfaces for Docker
-    app.run(host='0.0.0.0', port=3000, debug=True, use_reloader=False)
+    app.run(host='0.0.0.0', port=5050, debug=True, use_reloader=False)
