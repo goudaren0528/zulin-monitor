@@ -1,0 +1,76 @@
+{
+    "common": {
+        "username": "伟填",
+        "password": "Test0528.",
+        "headless": false
+    },
+    "order_scanner": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "scan_interval": 30,
+        "keyword_mapping": {
+            "G7X2": "星享生活",
+            "G7X3": "星享生活",
+            "Galaxy S23Ultra": "米奇租赁官方",
+            "RF100-400mm": "星享生活",
+            "SQ1": "星享生活",
+            "SX740": "米奇租赁官方",
+            "Ulike": "米奇租赁官方",
+            "X200": "米奇租赁官方",
+            "X300": "米奇租赁官方",
+            "action4": "米奇租赁官方",
+            "action5": "米奇租赁官方",
+            "mini11": "米奇租赁官方",
+            "mini12": "米奇租赁官方",
+            "mini40": "星享生活",
+            "mini90": "星享生活",
+            "mini99": "星享生活",
+            "wide": "米奇租赁官方",
+            "佳能 R50": "星享生活",
+            "佳能 RF50m": "星享生活",
+            "佳能RF-S 18-150": "星享生活",
+            "佳能RF-S 55-210": "星享生活",
+            "佳能ixus130": "米奇租赁官方",
+            "尼康": "星享生活",
+            "松下": "星享生活"
+        },
+        "rpa_group_mapping": {
+            "星享生活": "星享生活米奇支付宝入驻"
+        },
+        "webhook_configs": [
+            {
+                "targets": [
+                    "*"
+                ],
+                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+            },
+            {
+                "targets": [
+                    "米奇租赁官方"
+                ],
+                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833"
+            }
+        ]
+    },
+    "interface_monitor": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log",
+        "scan_interval": 43200,
+        "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d",
+        "headless": false,
+        "items": [
+            { "name": "E签宝静默签人脸", "threshold": 100 },
+            { "name": "E签宝静默签合同", "threshold": 100 },
+            { "name": "E签宝静默签商家授权", "threshold": 10 },
+            { "name": "短信发送", "threshold": 200 },
+            { "name": "OCR识别", "threshold": 200 },
+            { "name": "百融风控", "threshold": 100 }
+        ]
+    },
+    "order_sync": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.main",
+        "fetch_orders_api": "http://127.0.0.1:3000/api/order-sync/fetch",
+        "update_order_api": "http://127.0.0.1:3000/api/order-sync/update",
+        "scan_interval": 60,
+        "headless": false
+    }
+}
