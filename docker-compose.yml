@@ -11,8 +11,16 @@ services:
       - ./config.json:/app/config.json
     environment:
       - TZ=Asia/Shanghai
+    networks:
+      - web
+      - default
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=web"
       - "traefik.http.routers.order-point.rule=Host(`zulinmonitor.traefik.me`)"
       - "traefik.http.routers.order-point.entrypoints=web"
       - "traefik.http.services.order-point.loadbalancer.server.port=5050"
+
+networks:
+  web:
+    external: true
