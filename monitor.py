@@ -106,9 +106,6 @@ class InterfaceMonitor:
         target_url = self.get_config("url", "")
         scan_interval = self.get_config("scan_interval", 300)
         
-        # Force headless mode in Docker environment to prevent XServer errors
-        headless = True
-        
         monitor_log(f"启动监控浏览器... (Headless: {headless})")
         
         try:
@@ -128,25 +125,33 @@ class InterfaceMonitor:
                     monitor_log(f"访问 URL 失败: {e}")
                     return
 
-                # Auto Login Check
-                if username and password:
-                    user_selector = "#form1 > div > div:nth-child(3) > input"
-                    pass_selector = "#form1 > div > div:nth-child(4) > input"
-                    try:
+                # Helper for login
+                def perform_login(p_page):
+                    if username and password:
+                        user_selector = "#form1 > div > div:nth-child(3) > input"
+                        pass_selector = "#form1 > div > div:nth-child(4) > input"
                         try:
-                            page.wait_for_selector(user_selector, timeout=5000)
-                            monitor_log("检测到登录页面，开始自动登录...")
-                            page.fill(user_selector, username)
-                            page.fill(pass_selector, password)
-                            page.press(pass_selector, "Enter")
-                            page.wait_for_load_state("networkidle")
-                            monitor_log("登录操作完成，正在跳转到目标页面...")
-                            page.goto(target_url)
-                            page.wait_for_load_state("networkidle")
-                        except:
-                            monitor_log("未检测到登录输入框，假设已登录...")
-                    except Exception as e:
-                        monitor_log(f"自动登录尝试失败: {e}")
+                            # Check if login form exists
+                            if p_page.locator(user_selector).count() > 0:
+                                monitor_log("检测到登录页面，开始自动登录...")
+                                p_page.fill(user_selector, username)
+                                p_page.fill(pass_selector, password)
+                                p_page.press(pass_selector, "Enter")
+                                p_page.wait_for_load_state("networkidle")
+                                monitor_log("登录操作完成，正在跳转到目标页面...")
+                                p_page.goto(target_url)
+                                p_page.wait_for_load_state("networkidle")
+                                return True
+                        except Exception as e:
+                            monitor_log(f"自动登录尝试失败: {e}")
+                    return False
+
+                # Initial Login Check
+                try:
+                    page.wait_for_selector("#form1", timeout=5000)
+                    perform_login(page)
+                except:
+                    pass # Not on login page, proceed
 
                 monitor_log("开始监控循环...")
 
@@ -154,6 +159,14 @@ class InterfaceMonitor:
                     monitor_log(f"\n--- 开始新一轮监控 ({time.strftime('%H:%M:%S')}) ---")
                     
                     try:
+                        # Check if we are back on login page
+                        try:
+                            if page.locator("#form1").count() > 0:
+                                monitor_log("会话可能已过期，重新登录...")
+                                perform_login(page)
+                        except:
+                            pass
+
                         # Selector provided: body > div.wb-container.right-panel > div.page-content > div:nth-child(1) > div:nth-child(2)
                         # Updated to be more generic as per user feedback
                         container_selector = ".page-content"
