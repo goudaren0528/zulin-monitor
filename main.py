@@ -275,37 +275,107 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                args = ["--window-position=0,0"] if not headless else []
+                args = ["--window-position=0,0", "--disable-blink-features=AutomationControlled"] if not headless else ["--disable-blink-features=AutomationControlled"]
                 browser = p.chromium.launch(headless=headless, args=args)
-                context = browser.new_context()
+                
+                # Create context with custom user agent to avoid bot detection
+                context = browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
                 page = context.new_page()
 
                 log(f"正在访问: {url}")
                 try:
-                    page.goto(url)
+                    page.goto(url, timeout=60000)
+                    page.wait_for_load_state("networkidle", timeout=30000)
                 except Exception as e:
                     log(f"访问 URL 失败: {e}")
-                    return
+                    # Try to continue anyway, maybe partial load
+                
+                # Check current page state
+                current_url = page.url
+                page_title = page.title()
+                log(f"当前页面: {current_url} | 标题: {page_title}")
 
-                # Auto Login
+                # Auto Login Logic
                 if username and password:
-                    user_selector = "#form1 > div > div:nth-child(3) > input"
-                    pass_selector = "#form1 > div > div:nth-child(4) > input"
-                    try:
+                    log("正在检测登录页面...")
+                    
+                    # Try multiple selectors for login inputs
+                    user_selectors = [
+                        "#form1 > div > div:nth-child(3) > input", 
+                        "input[name='username']", 
+                        "input[name='account']",
+                        "input[type='text'][placeholder*='账号']",
+                        "input[type='text'][placeholder*='用户名']"
+                    ]
+                    pass_selectors = [
+                        "#form1 > div > div:nth-child(4) > input", 
+                        "input[name='password']", 
+                        "input[type='password']"
+                    ]
+                    login_btn_selectors = [
+                        "input[type='submit']",
+                        "button[type='submit']",
+                        "button:has-text('登录')",
+                        "#form1 input[type='submit']"
+                    ]
+
+                    # Check if we are on login page (look for inputs)
+                    found_login = False
+                    user_input = None
+                    pass_input = None
+                    
+                    for sel in user_selectors:
+                        if page.locator(sel).first.is_visible():
+                            user_input = page.locator(sel).first
+                            found_login = True
+                            log(f"找到用户名输入框: {sel}")
+                            break
+                    
+                    if found_login:
+                        for sel in pass_selectors:
+                            if page.locator(sel).first.is_visible():
+                                pass_input = page.locator(sel).first
+                                log(f"找到密码输入框: {sel}")
+                                break
+                    
+                    if found_login and user_input and pass_input:
+                        log("检测到登录页面，开始自动登录...")
                         try:
-                            page.wait_for_selector(user_selector, timeout=5000)
-                            log("检测到登录页面，开始自动登录...")
-                            page.fill(user_selector, username)
-                            page.fill(pass_selector, password)
-                            page.press(pass_selector, "Enter")
-                            page.wait_for_load_state("networkidle")
-                            log("登录操作完成，正在跳转到目标页面...")
-                            page.goto(url)
-                            page.wait_for_load_state("networkidle")
-                        except:
-                            log("未检测到登录输入框，跳过自动登录...")
-                    except Exception as e:
-                        log(f"自动登录尝试失败: {e}")
+                            user_input.fill(username)
+                            pass_input.fill(password)
+                            
+                            # Try clicking login button first, fallback to Enter
+                            clicked_login = False
+                            for btn_sel in login_btn_selectors:
+                                btn = page.locator(btn_sel).first
+                                if btn.is_visible():
+                                    log(f"点击登录按钮: {btn_sel}")
+                                    btn.click()
+                                    clicked_login = True
+                                    break
+                            
+                            if not clicked_login:
+                                log("未找到显式登录按钮，尝试回车登录...")
+                                pass_input.press("Enter")
+                                
+                            page.wait_for_load_state("networkidle", timeout=30000)
+                            log("登录操作提交，等待跳转...")
+                            
+                            # Wait for url change or specific element
+                            try:
+                                page.wait_for_url(lambda u: "login" not in u.lower(), timeout=10000)
+                            except:
+                                pass
+                                
+                        except Exception as e:
+                            log(f"自动登录操作失败: {e}")
+                    else:
+                        log("未检测到登录输入框或登录失败，尝试直接继续...")
+                        # Debug: print HTML if not found
+                        if "login" in current_url.lower():
+                            log("警告: URL包含 'login' 但未找到输入框，页面可能未加载完全")
 
                 if not headless:
                     log("请在浏览器中完成登录（如果需要）...")
