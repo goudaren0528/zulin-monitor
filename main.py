@@ -303,27 +303,9 @@ class OrderScanner:
                 
                 safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
 
-                cookie_string = self.get_config("cookie_string", "")
-                cookie_domain = parsed.netloc
-
-                def apply_cookies():
-                    if not cookie_string or not cookie_domain:
-                        return
-                    cookies = []
-                    for part in cookie_string.split(";"):
-                        part = part.strip()
-                        if not part or "=" not in part:
-                            continue
-                        name, value = part.split("=", 1)
-                        cookies.append({"name": name, "value": value, "domain": cookie_domain, "path": "/"})
-                    if cookies:
-                        context.add_cookies(cookies)
-                        log("已注入 Cookie")
-                
                 resp = None
                 try:
                     log(f"准备访问安全入口 (Monitor同款): {safe_entry_url}")
-                    apply_cookies()
                     resp = page.goto(safe_entry_url)
                     page.wait_for_load_state("networkidle")
                 except Exception as e:
@@ -423,11 +405,6 @@ class OrderScanner:
                             self.stop_event.wait(5)
                             try:
                                 if status_code == 405:
-                                    try:
-                                        context.clear_cookies()
-                                    except Exception:
-                                        pass
-                                    apply_cookies()
                                     page.goto(safe_entry_url)
                                     page.wait_for_load_state("networkidle")
                                     try:
