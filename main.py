@@ -277,23 +277,16 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                args = ["--window-position=0,0", "--disable-blink-features=AutomationControlled"] if not headless else ["--disable-blink-features=AutomationControlled"]
+                args = []
                 browser = p.chromium.launch(headless=headless, args=args)
                 
-                # Create context with custom user agent to avoid bot detection
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                )
+                context = browser.new_context()
                 page = context.new_page()
 
                 log(f"正在访问: {url}")
                 resp = None
                 try:
-                    resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                    try:
-                        page.wait_for_load_state("networkidle", timeout=15000)
-                    except Exception:
-                        pass
+                    resp = page.goto(url, timeout=60000)
                 except Exception as e:
                     log(f"访问 URL 失败: {e}")
                     # Try to continue anyway, maybe partial load
@@ -308,6 +301,24 @@ class OrderScanner:
                 except Exception:
                     status_code = None
                 log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
+
+                if status_code == 405 and username and password:
+                    login_url = ""
+                    try:
+                        from urllib.parse import urlparse
+                        parsed = urlparse(url)
+                        if parsed.scheme and parsed.netloc:
+                            login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
+                    except Exception:
+                        login_url = ""
+
+                    if login_url:
+                        log(f"检测到 405，尝试先打开登录页: {login_url}")
+                        try:
+                            page.goto(login_url, timeout=60000)
+                            page.wait_for_load_state("networkidle", timeout=30000)
+                        except Exception as e:
+                            log(f"打开登录页失败: {e}")
 
                 # Auto Login Logic
                 if username and password:
@@ -379,6 +390,15 @@ class OrderScanner:
                             try:
                                 page.wait_for_url(lambda u: "login" not in u.lower(), timeout=10000)
                             except:
+                                pass
+                            
+                            try:
+                                page.goto(url, timeout=60000)
+                                page.wait_for_load_state("networkidle", timeout=30000)
+                                current_url = page.url
+                                page_title = page.title()
+                                log(f"登录后页面: {current_url} | 标题: {page_title}")
+                            except Exception:
                                 pass
                                 
                         except Exception as e:
