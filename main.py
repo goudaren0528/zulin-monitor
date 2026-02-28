@@ -341,10 +341,13 @@ class OrderScanner:
                             log("Requests 访问也异常，可能是 IP 被封禁")
                     except Exception as e:
                         log(f"Requests 预检失败: {e}")
-
-                # Initial Login Check
-                try:
-                    # Try to handle 405 by forcing login page first
+ 
+                 # Initial Login Check
+                 try:
+                    # Check if we need to handle 405 by switching to login page first
+                    # Monitor script uses 'r=statistics.interface_log' which works, but 'r=order.list.status1' might be blocked
+                    # If 405, we try to navigate to login page, just like we would if we were redirected
+                    
                     status_code = 0
                     try:
                         # Check status code from last navigation if possible, or just check title
@@ -361,14 +364,28 @@ class OrderScanner:
                              parsed = urlparse(url)
                              if parsed.scheme and parsed.netloc:
                                  login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
+                                 # Use same goto strategy as monitor.py
                                  page.goto(login_url)
+                                 page.wait_for_load_state("networkidle")
                          except:
                              pass
 
-                    page.wait_for_selector("#form1", timeout=5000)
-                    perform_login(page)
-                except:
-                    pass # Not on login page, proceed
+                    # Try to find login form
+                    try:
+                        page.wait_for_selector("#form1", timeout=5000)
+                        perform_login(page)
+                    except:
+                        pass # Not on login page
+                        
+                    # After potential login, ensure we are at the target URL
+                    if "order.list.status1" not in page.url:
+                        log(f"当前不在订单列表页，跳转: {url}")
+                        page.goto(url)
+                        page.wait_for_load_state("networkidle")
+                        
+                except Exception as e:
+                    log(f"初始化页面/登录流程出错: {e}")
+                    pass # Proceed to loop to let it retry or fail gracefully
 
                 log("检测到目标页面，开始执行自动化流程...")
                 
