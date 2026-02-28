@@ -277,36 +277,53 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                args = [] 
+                args = []
                 browser = p.chromium.launch(headless=headless, args=args)
-                
-                # Mimic a real desktop browser more closely
-                context = browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    viewport={"width": 1920, "height": 1080},
-                    locale="zh-CN",
-                    timezone_id="Asia/Shanghai"
-                )
-                
-                # Add extra headers to avoid simple bot detection
+
+                storage_state_path = self.get_config("storage_state_path", "")
+                context_options = {
+                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "viewport": {"width": 1920, "height": 1080},
+                    "locale": "zh-CN",
+                    "timezone_id": "Asia/Shanghai",
+                }
+                if storage_state_path and os.path.exists(storage_state_path):
+                    context_options["storage_state"] = storage_state_path
+
+                context = browser.new_context(**context_options)
                 context.set_extra_http_headers({
                     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
                 })
-
+                context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
                 page = context.new_page()
 
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
                 
-                # IMPORTANT: Use the exact URL that WORKS in monitor.py
-                # monitor.py uses: ...&r=statistics.interface_log
-                # Do NOT use r=shop or r=order.list.status1 as entry point as they might be 405 blocked
                 safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
+
+                cookie_string = self.get_config("cookie_string", "")
+                cookie_domain = parsed.netloc
+
+                def apply_cookies():
+                    if not cookie_string or not cookie_domain:
+                        return
+                    cookies = []
+                    for part in cookie_string.split(";"):
+                        part = part.strip()
+                        if not part or "=" not in part:
+                            continue
+                        name, value = part.split("=", 1)
+                        cookies.append({"name": name, "value": value, "domain": cookie_domain, "path": "/"})
+                    if cookies:
+                        context.add_cookies(cookies)
+                        log("已注入 Cookie")
                 
                 resp = None
                 try:
                     log(f"准备访问安全入口 (Monitor同款): {safe_entry_url}")
+                    apply_cookies()
                     resp = page.goto(safe_entry_url)
                     page.wait_for_load_state("networkidle")
                 except Exception as e:
@@ -405,8 +422,13 @@ class OrderScanner:
                             log("5秒后将尝试重新加载...")
                             self.stop_event.wait(5)
                             try:
-                                if status_code == 405 and shop_url:
-                                    page.goto(shop_url)
+                                if status_code == 405:
+                                    try:
+                                        context.clear_cookies()
+                                    except Exception:
+                                        pass
+                                    apply_cookies()
+                                    page.goto(safe_entry_url)
                                     page.wait_for_load_state("networkidle")
                                     try:
                                         if page.locator("#form1").count() > 0:
@@ -414,11 +436,17 @@ class OrderScanner:
                                     except Exception:
                                         pass
                                     try:
-                                        page.click("#navheight > li:nth-child(5) > a")
-                                        page.wait_for_load_state("networkidle")
-                                        page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
-                                        page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
-                                        page.wait_for_load_state("networkidle")
+                                        if "order.list.status1" not in page.url:
+                                            try:
+                                                page.wait_for_selector("#navheight", timeout=5000)
+                                                page.click("#navheight > li:nth-child(5) > a")
+                                                page.wait_for_load_state("networkidle")
+                                                page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
+                                                page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
+                                                page.wait_for_load_state("networkidle")
+                                            except Exception:
+                                                page.goto(url)
+                                                page.wait_for_load_state("networkidle")
                                     except Exception:
                                         pass
                                     try:
