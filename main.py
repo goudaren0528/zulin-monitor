@@ -286,24 +286,26 @@ class OrderScanner:
                 page = context.new_page()
 
                 # Reuse login logic (accessing target_url directly might redirect to login)
-                # Strategy: Access login page first, then navigate to target URL
+                # Strategy: Mimic monitor.py exactly - access a safe URL first
+                # monitor.py accesses 'r=statistics.interface_log' which works fine
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
-                login_url = ""
-                if parsed.scheme and parsed.netloc:
-                    login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
                 
-                log(f"准备访问: {login_url or url}")
+                # Use the exact same URL pattern as monitor.py, just different route
+                safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
+                
+                log(f"准备访问安全入口 (参考 monitor.py): {safe_entry_url}")
                 resp = None
                 try:
-                    if login_url:
-                        log(f"优先访问登录页: {login_url}")
-                        resp = page.goto(login_url)
-                    else:
-                        resp = page.goto(url)
+                    # Access the safe URL first - this should trigger login page if not authenticated
+                    # And it is KNOWN to not be 405 blocked (since monitor works)
+                    resp = page.goto(safe_entry_url)
+                    page.wait_for_load_state("networkidle")
+                        
                 except Exception as e:
-                    log(f"访问 URL 失败: {e}")
-                    return
+                    log(f"访问安全入口失败: {e}")
+                    # Keep going to try login detection
+
 
                 # Helper for login
                 def perform_login(p_page):
