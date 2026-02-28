@@ -155,7 +155,7 @@ class OrderScanner:
         self.load_config()
         self.stop_event.clear()
         self.running = True
-        self.thread = threading.Thread(target=self._run_loop)
+        self.thread = threading.Thread(target=self._run_loop, name="OrderScannerThread")
         self.thread.daemon = True
         self.thread.start()
         log("服务启动中...")
@@ -167,9 +167,11 @@ class OrderScanner:
         
         log("正在停止服务...")
         self.stop_event.set()
-        # Wait a bit for the thread to finish cleanly, but don't block forever
-        self.running = False
-        # Thread will exit when it checks stop_event
+        if self.thread and self.thread.is_alive():
+            try:
+                self.thread.join(timeout=5)
+            except Exception:
+                pass
 
     def restart(self):
         self.stop()
@@ -285,9 +287,13 @@ class OrderScanner:
                 page = context.new_page()
 
                 log(f"正在访问: {url}")
+                resp = None
                 try:
-                    page.goto(url, timeout=60000)
-                    page.wait_for_load_state("networkidle", timeout=30000)
+                    resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        pass
                 except Exception as e:
                     log(f"访问 URL 失败: {e}")
                     # Try to continue anyway, maybe partial load
@@ -295,7 +301,13 @@ class OrderScanner:
                 # Check current page state
                 current_url = page.url
                 page_title = page.title()
-                log(f"当前页面: {current_url} | 标题: {page_title}")
+                status_code = None
+                try:
+                    if resp:
+                        status_code = resp.status
+                except Exception:
+                    status_code = None
+                log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
 
                 # Auto Login Logic
                 if username and password:
@@ -380,13 +392,87 @@ class OrderScanner:
                 if not headless:
                     log("请在浏览器中完成登录（如果需要）...")
                 
-                try:
-                    log("等待页面关键元素...")
-                    page.wait_for_selector("#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')", timeout=60000)
-                except Exception as e:
-                    log("等待超时或出错，请检查是否已登录。")
-                    browser.close()
-                    self.running = False
+                key_selector = "#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')"
+                while not self.stop_event.is_set():
+                    try:
+                        if status_code is not None and status_code >= 400:
+                            try:
+                                snippet = _truncate_text(page.content(), 600)
+                                log(f"页面异常响应: {status_code} content={snippet}")
+                            except Exception:
+                                pass
+                            try:
+                                page.screenshot(path="debug_last_page.png", full_page=True)
+                                log("已保存页面截图: debug_last_page.png")
+                            except Exception:
+                                pass
+                            log("5秒后将尝试重新加载...")
+                            self.stop_event.wait(5)
+                            try:
+                                resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                                try:
+                                    page.wait_for_load_state("networkidle", timeout=15000)
+                                except Exception:
+                                    pass
+                                status_code = resp.status if resp else None
+                            except Exception:
+                                status_code = None
+                            try:
+                                current_url = page.url
+                                page_title = page.title()
+                                log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
+                            except Exception:
+                                pass
+                            continue
+
+                        log("等待页面关键元素...")
+                        ready = False
+                        for _ in range(12):
+                            if self.stop_event.is_set():
+                                break
+                            try:
+                                page.wait_for_selector(key_selector, timeout=5000, state="visible")
+                                ready = True
+                                break
+                            except Exception:
+                                continue
+                        if ready:
+                            break
+
+                        try:
+                            snippet = _truncate_text(page.content(), 600)
+                            log(f"等待关键元素超时 content={snippet}")
+                        except Exception:
+                            log("等待关键元素超时")
+                        try:
+                            page.screenshot(path="debug_last_page.png", full_page=True)
+                            log("已保存页面截图: debug_last_page.png")
+                        except Exception:
+                            pass
+                        log("5秒后将尝试重新加载...")
+                        self.stop_event.wait(5)
+                        try:
+                            page.reload(timeout=60000)
+                        except Exception:
+                            try:
+                                page.goto(url, timeout=60000, wait_until="domcontentloaded")
+                            except Exception:
+                                pass
+                        continue
+                    except Exception as e:
+                        log(f"页面初始化阶段异常: {e}")
+                        log("5秒后将尝试重新加载...")
+                        self.stop_event.wait(5)
+                        try:
+                            page.reload(timeout=60000)
+                        except Exception:
+                            pass
+
+                if self.stop_event.is_set():
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
                     return
 
                 log("检测到目标页面，开始执行自动化流程...")
@@ -429,7 +515,7 @@ class OrderScanner:
 
                     if found_count:
                         log(f"待审核数量为 0，等待 {scan_interval} 秒后重试...")
-                        time.sleep(scan_interval)
+                        self.stop_event.wait(scan_interval)
                         log("正在刷新页面...")
                         try:
                             page.reload(timeout=60000)
@@ -456,7 +542,7 @@ class OrderScanner:
                             log("点击 '待审' Tab...")
                             target_link.click()
                             page.wait_for_load_state("networkidle")
-                            time.sleep(2)
+                            self.stop_event.wait(2)
                     except Exception as e:
                         log(f"点击 Tab 操作异常: {e}")
 
@@ -743,10 +829,10 @@ class OrderScanner:
                     if not self.stop_event.is_set():
                         if processed_count > 0:
                             log(f"本轮已处理 {processed_count} 个订单，立即刷新页面继续...")
-                            time.sleep(2)
+                            self.stop_event.wait(2)
                         else:
                             log(f"本轮结束，等待 {scan_interval} 秒...")
-                            time.sleep(scan_interval)
+                            self.stop_event.wait(scan_interval)
                         
                         try:
                             page.reload()
