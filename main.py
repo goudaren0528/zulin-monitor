@@ -285,17 +285,16 @@ class OrderScanner:
 
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
-                base_url = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
-                shop_url = f"{base_url}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=shop" if base_url else ""
-
+                
+                # IMPORTANT: Use the exact URL that WORKS in monitor.py
+                # monitor.py uses: ...&r=statistics.interface_log
+                # Do NOT use r=shop or r=order.list.status1 as entry point as they might be 405 blocked
+                safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
+                
                 resp = None
                 try:
-                    if shop_url:
-                        log(f"准备访问入口: {shop_url}")
-                        resp = page.goto(shop_url)
-                    else:
-                        log(f"准备访问入口: {url}")
-                        resp = page.goto(url)
+                    log(f"准备访问安全入口 (Monitor同款): {safe_entry_url}")
+                    resp = page.goto(safe_entry_url)
                     page.wait_for_load_state("networkidle")
                 except Exception as e:
                     log(f"访问入口失败: {e}")
@@ -336,22 +335,39 @@ class OrderScanner:
                     pass
 
                 try:
-                    if shop_url and "r=shop" not in page.url:
-                        page.goto(shop_url)
+                    # If we are not on the target page, navigate there
+                    # But first check if we are on a 405 page
+                    title = page.title()
+                    if "405" in title:
+                        log("入口页面返回 405，尝试直接访问登录页...")
+                        # Last resort: Try clean login URL
+                        login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login"
+                        page.goto(login_url)
                         page.wait_for_load_state("networkidle")
-                except Exception:
-                    pass
-
-                try:
-                    log("点击一级菜单 (#navheight > li:nth-child(5) > a)...")
-                    page.click("#navheight > li:nth-child(5) > a")
-                    page.wait_for_load_state("networkidle")
-                    page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
-                    log("点击三级菜单 (body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a)...")
-                    page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
-                    page.wait_for_load_state("networkidle")
+                        
+                    if "order.list.status1" not in page.url:
+                        # Try UI navigation first if possible
+                        log("尝试通过 UI 菜单导航到订单页...")
+                        try:
+                            # Ensure we have menus loaded (if we are on statistics page, we should have them)
+                            page.wait_for_selector("#navheight", timeout=5000)
+                            
+                            log("点击一级菜单 (#navheight > li:nth-child(5) > a)...")
+                            page.click("#navheight > li:nth-child(5) > a")
+                            page.wait_for_load_state("networkidle")
+                            
+                            log("等待二级菜单容器...")
+                            page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
+                            
+                            log("点击三级菜单 (订单列表)...")
+                            page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
+                            page.wait_for_load_state("networkidle")
+                        except Exception as nav_e:
+                            log(f"UI 导航失败 ({nav_e})，尝试直接跳转: {url}")
+                            page.goto(url)
+                            page.wait_for_load_state("networkidle")
                 except Exception as e:
-                    log(f"菜单导航失败: {e}")
+                    log(f"导航逻辑异常: {e}")
 
                 try:
                     status_code = 405 if "405" in page.title() else status_code
