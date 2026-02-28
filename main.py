@@ -277,20 +277,44 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                args = []
+                # args = ["--window-position=0,0"] if not headless else []
+                # Remove window hiding to allow user to see the browser
+                args = [] 
                 browser = p.chromium.launch(headless=headless, args=args)
                 
                 context = browser.new_context()
                 page = context.new_page()
 
+                # Reuse login logic (accessing target_url directly might redirect to login)
                 log(f"正在访问: {url}")
                 resp = None
                 try:
-                    resp = page.goto(url, timeout=60000)
+                    resp = page.goto(url)
                 except Exception as e:
                     log(f"访问 URL 失败: {e}")
-                    # Try to continue anyway, maybe partial load
-                
+                    return
+
+                # Helper for login
+                def perform_login(p_page):
+                    if username and password:
+                        user_selector = "#form1 > div > div:nth-child(3) > input"
+                        pass_selector = "#form1 > div > div:nth-child(4) > input"
+                        try:
+                            # Check if login form exists
+                            if p_page.locator(user_selector).count() > 0:
+                                log("检测到登录页面，开始自动登录...")
+                                p_page.fill(user_selector, username)
+                                p_page.fill(pass_selector, password)
+                                p_page.press(pass_selector, "Enter")
+                                p_page.wait_for_load_state("networkidle")
+                                log("登录操作完成，正在跳转到目标页面...")
+                                p_page.goto(url)
+                                p_page.wait_for_load_state("networkidle")
+                                return True
+                        except Exception as e:
+                            log(f"自动登录尝试失败: {e}")
+                    return False
+
                 # Check current page state
                 current_url = page.url
                 page_title = page.title()
@@ -302,115 +326,51 @@ class OrderScanner:
                     status_code = None
                 log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
 
-                if status_code == 405 and username and password:
-                    login_url = ""
+                # Simple requests pre-check to debug IP blocking
+                if status_code == 405 or status_code == 403:
                     try:
-                        from urllib.parse import urlparse
-                        parsed = urlparse(url)
-                        if parsed.scheme and parsed.netloc:
-                            login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
-                    except Exception:
-                        login_url = ""
+                        import requests
+                        log("尝试使用 requests 进行连通性预检...")
+                        r = requests.get(url, allow_redirects=False, timeout=10)
+                        log(f"Requests 预检结果: status={r.status_code} location={r.headers.get('Location')}")
+                        if r.status_code == 200:
+                            log("Requests 访问正常，可能是浏览器指纹被拦截")
+                        elif r.status_code == 302:
+                            log("Requests 检测到重定向，可能是未登录")
+                        else:
+                            log("Requests 访问也异常，可能是 IP 被封禁")
+                    except Exception as e:
+                        log(f"Requests 预检失败: {e}")
 
-                    if login_url:
-                        log(f"检测到 405，尝试先打开登录页: {login_url}")
-                        try:
-                            page.goto(login_url, timeout=60000)
-                            page.wait_for_load_state("networkidle", timeout=30000)
-                        except Exception as e:
-                            log(f"打开登录页失败: {e}")
+                # Initial Login Check
+                try:
+                    # Try to handle 405 by forcing login page first
+                    status_code = 0
+                    try:
+                        # Check status code from last navigation if possible, or just check title
+                        title = page.title()
+                        if "405" in title:
+                             status_code = 405
+                    except:
+                        pass
 
-                # Auto Login Logic
-                if username and password:
-                    log("正在检测登录页面...")
-                    
-                    # Try multiple selectors for login inputs
-                    user_selectors = [
-                        "#form1 > div > div:nth-child(3) > input", 
-                        "input[name='username']", 
-                        "input[name='account']",
-                        "input[type='text'][placeholder*='账号']",
-                        "input[type='text'][placeholder*='用户名']"
-                    ]
-                    pass_selectors = [
-                        "#form1 > div > div:nth-child(4) > input", 
-                        "input[name='password']", 
-                        "input[type='password']"
-                    ]
-                    login_btn_selectors = [
-                        "input[type='submit']",
-                        "button[type='submit']",
-                        "button:has-text('登录')",
-                        "#form1 input[type='submit']"
-                    ]
+                    if status_code == 405:
+                         log("检测到 405，尝试先打开登录页...")
+                         try:
+                             from urllib.parse import urlparse
+                             parsed = urlparse(url)
+                             if parsed.scheme and parsed.netloc:
+                                 login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
+                                 page.goto(login_url)
+                         except:
+                             pass
 
-                    # Check if we are on login page (look for inputs)
-                    found_login = False
-                    user_input = None
-                    pass_input = None
-                    
-                    for sel in user_selectors:
-                        if page.locator(sel).first.is_visible():
-                            user_input = page.locator(sel).first
-                            found_login = True
-                            log(f"找到用户名输入框: {sel}")
-                            break
-                    
-                    if found_login:
-                        for sel in pass_selectors:
-                            if page.locator(sel).first.is_visible():
-                                pass_input = page.locator(sel).first
-                                log(f"找到密码输入框: {sel}")
-                                break
-                    
-                    if found_login and user_input and pass_input:
-                        log("检测到登录页面，开始自动登录...")
-                        try:
-                            user_input.fill(username)
-                            pass_input.fill(password)
-                            
-                            # Try clicking login button first, fallback to Enter
-                            clicked_login = False
-                            for btn_sel in login_btn_selectors:
-                                btn = page.locator(btn_sel).first
-                                if btn.is_visible():
-                                    log(f"点击登录按钮: {btn_sel}")
-                                    btn.click()
-                                    clicked_login = True
-                                    break
-                            
-                            if not clicked_login:
-                                log("未找到显式登录按钮，尝试回车登录...")
-                                pass_input.press("Enter")
-                                
-                            page.wait_for_load_state("networkidle", timeout=30000)
-                            log("登录操作提交，等待跳转...")
-                            
-                            # Wait for url change or specific element
-                            try:
-                                page.wait_for_url(lambda u: "login" not in u.lower(), timeout=10000)
-                            except:
-                                pass
-                            
-                            try:
-                                page.goto(url, timeout=60000)
-                                page.wait_for_load_state("networkidle", timeout=30000)
-                                current_url = page.url
-                                page_title = page.title()
-                                log(f"登录后页面: {current_url} | 标题: {page_title}")
-                            except Exception:
-                                pass
-                                
-                        except Exception as e:
-                            log(f"自动登录操作失败: {e}")
-                    else:
-                        log("未检测到登录输入框或登录失败，尝试直接继续...")
-                        # Debug: print HTML if not found
-                        if "login" in current_url.lower():
-                            log("警告: URL包含 'login' 但未找到输入框，页面可能未加载完全")
+                    page.wait_for_selector("#form1", timeout=5000)
+                    perform_login(page)
+                except:
+                    pass # Not on login page, proceed
 
-                if not headless:
-                    log("请在浏览器中完成登录（如果需要）...")
+                log("检测到目标页面，开始执行自动化流程...")
                 
                 key_selector = "#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')"
                 while not self.stop_event.is_set():
