@@ -31,6 +31,89 @@ def log(message):
     if len(LOG_BUFFER) > MAX_LOG_SIZE:
         LOG_BUFFER.pop(0)
 
+def _truncate_text(text, max_len=240):
+    try:
+        s = "" if text is None else str(text)
+    except Exception:
+        return ""
+    s = s.replace("\r", " ").replace("\n", " ").strip()
+    if len(s) <= max_len:
+        return s
+    return s[:max_len] + "..."
+
+def _mask_sensitive(text):
+    import re
+
+    s = "" if text is None else str(text)
+
+    def _mask_mobile(m):
+        num = m.group(0)
+        if len(num) == 11:
+            return num[:3] + "****" + num[-4:]
+        return num
+
+    try:
+        s = re.sub(r"\b1\d{10}\b", _mask_mobile, s)
+    except Exception:
+        pass
+
+    return s
+
+def _safe_locator_info(locator):
+    info = {"count": None, "visible": None}
+    try:
+        info["count"] = locator.count()
+    except Exception:
+        info["count"] = None
+    try:
+        info["visible"] = locator.is_visible()
+    except Exception:
+        info["visible"] = None
+    return info
+
+def _safe_inner_text(locator, default=""):
+    try:
+        return locator.inner_text()
+    except Exception:
+        return default
+
+def _extract_order_fields(block_text):
+    import re
+
+    text = "" if block_text is None else str(block_text)
+    fields = {}
+
+    patterns = {
+        "order_no": r"订单号[:：]\s*([A-Za-z0-9_-]+)",
+        "pay_no": r"支付单号[:：]\s*([A-Za-z0-9_-]+)",
+        "mobile": r"(?:手机|电话)[:：]\s*(1\d{10})",
+    }
+
+    for key, pattern in patterns.items():
+        try:
+            m = re.search(pattern, text)
+            if m:
+                val = m.group(1).strip()
+                if key == "mobile" and len(val) == 11:
+                    val = val[:3] + "****" + val[-4:]
+                fields[key] = val
+        except Exception:
+            continue
+
+    return fields
+
+def _extract_merchant_from_text(block_text):
+    import re
+
+    text = "" if block_text is None else str(block_text)
+    try:
+        m = re.search(r"商户名称[:：]\s*([^\s]+)", text)
+        if m:
+            return m.group(1).strip()
+    except Exception:
+        return None
+    return None
+
 class OrderScanner:
     def __init__(self):
         self.config = {}
@@ -240,6 +323,10 @@ class OrderScanner:
 
                 while not self.stop_event.is_set():
                     log(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
+                    try:
+                        log(f"页面信息: url={page.url}")
+                    except Exception:
+                        pass
                     
                     # 1. Check Count
                     found_count = False
@@ -308,6 +395,18 @@ class OrderScanner:
                     items_locator = page.locator(f"{container_selector} > div")
                     items_count = items_locator.count()
                     log(f"当前页面列表项总数: {items_count}")
+
+                    scan_stats = {
+                        "row_total": 0,
+                        "merchant_selector_missing": 0,
+                        "merchant_not_visible": 0,
+                        "merchant_text_empty": 0,
+                        "merchant_non_target": 0,
+                        "merchant_target": 0,
+                        "order_text_missing": 0,
+                        "order_text_empty": 0,
+                    }
+                    merchant_top = {}
                     
                     processed_count = 0
                     start_index = 3
@@ -319,15 +418,64 @@ class OrderScanner:
                         merchant_selector = f"{current_item_selector} > div.table-row.table-top > div > span:nth-child(3)"
                         
                         try:
-                            if not page.locator(merchant_selector).is_visible():
+                            scan_stats["row_total"] += 1
+                            item_loc = page.locator(current_item_selector)
+
+                            merchant_loc = page.locator(merchant_selector)
+                            merchant_info = _safe_locator_info(merchant_loc)
+                            merchant_name = ""
+                            merchant_name_clean = ""
+                            merchant_source = "selector"
+
+                            if merchant_info.get("count") == 0:
+                                row_text = _safe_inner_text(item_loc, "")
+                                parsed = _extract_merchant_from_text(row_text)
+                                if parsed:
+                                    merchant_name_clean = parsed
+                                    merchant_source = "text_parse"
+                                else:
+                                    scan_stats["merchant_selector_missing"] += 1
+                                    if scan_stats["merchant_selector_missing"] <= 6:
+                                        has_kw = "商户名称" in row_text
+                                        log(
+                                            f"[调试] 未找到商户字段: idx={i} selector={merchant_selector} "
+                                            f"has_kw={has_kw} row={_truncate_text(_mask_sensitive(row_text))}"
+                                        )
+                                    continue
+                            else:
+                                if not merchant_info.get("visible"):
+                                    scan_stats["merchant_not_visible"] += 1
+                                    if scan_stats["merchant_not_visible"] <= 3:
+                                        log(f"[调试] 商户字段不可见: idx={i} info={merchant_info}")
+                                    continue
+                                merchant_name = _safe_inner_text(merchant_loc, "").strip()
+                                merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
+                                merchant_name_clean = "".join(merchant_name_clean.split())
+
+                            if not merchant_name_clean:
+                                scan_stats["merchant_text_empty"] += 1
+                                if scan_stats["merchant_text_empty"] <= 3:
+                                    row_text = _safe_inner_text(item_loc, "")
+                                    log(
+                                        f"[调试] 商户文本为空: idx={i} source={merchant_source} "
+                                        f"raw={_truncate_text(_mask_sensitive(merchant_name))} row={_truncate_text(_mask_sensitive(row_text))}"
+                                    )
                                 continue
-                                
-                            merchant_name = page.locator(merchant_selector).inner_text().strip()
-                            merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
+
+                            merchant_top[merchant_name_clean] = merchant_top.get(merchant_name_clean, 0) + 1
                             
                             if merchant_name_clean != "米奇租赁":
-                                # log(f"跳过商户: {merchant_name_clean}")
+                                scan_stats["merchant_non_target"] += 1
+                                if scan_stats["merchant_non_target"] <= 6:
+                                    row_text = _safe_inner_text(item_loc, "")
+                                    log(
+                                        f"[调试] 跳过非目标商户: idx={i} source={merchant_source} "
+                                        f"merchant={merchant_name_clean} raw={_truncate_text(_mask_sensitive(merchant_name))} "
+                                        f"row={_truncate_text(_mask_sensitive(row_text))}"
+                                    )
                                 continue
+
+                            scan_stats["merchant_target"] += 1
                             
                             log(f"-> 发现米奇租赁订单 (索引: {i})...")
                             item_selector = current_item_selector
@@ -336,10 +484,28 @@ class OrderScanner:
                             text_content = ""
                             try:
                                 text_element = page.locator(text_selector)
-                                text_content = text_element.inner_text()
-                                log(f"订单内容: {text_content}")
-                            except:
-                                log("获取订单内容失败")
+                                text_info = _safe_locator_info(text_element)
+                                if text_info.get("count") == 0:
+                                    scan_stats["order_text_missing"] += 1
+                                    row_text = _safe_inner_text(item_loc, "")
+                                    log(f"[调试] 未找到订单内容元素: idx={i} selector={text_selector} row={_truncate_text(_mask_sensitive(row_text))}")
+                                    continue
+
+                                text_content = _safe_inner_text(text_element, "").strip()
+                                if not text_content:
+                                    scan_stats["order_text_empty"] += 1
+                                    row_text = _safe_inner_text(item_loc, "")
+                                    log(f"[调试] 订单内容为空: idx={i} info={text_info} row={_truncate_text(_mask_sensitive(row_text))}")
+                                    continue
+
+                                row_text = _safe_inner_text(item_loc, "")
+                                extra_fields = _extract_order_fields(row_text)
+                                extra_kv = " ".join([f"{k}={v}" for k, v in extra_fields.items()])
+                                extra_part = f" {extra_kv}" if extra_kv else ""
+                                log(f"订单内容: {_truncate_text(_mask_sensitive(text_content), 500)} | merchant={merchant_name_clean}{extra_part}")
+                            except Exception as e:
+                                scan_stats["order_text_missing"] += 1
+                                log(f"获取订单内容失败: idx={i} err={e}")
                                 continue
             
                             target_option = "米奇租赁官方"
@@ -355,42 +521,74 @@ class OrderScanner:
                             
                             # Assign
                             try:
-                                # Try to find the assign button using specific column or text
-                                # User reported it's in nth-child(7), but we use a more robust search for "分配" text within the row
-                                assign_btn = page.locator(item_selector).locator("a").filter(has_text="分配")
-                                
+                                assign_btn = item_loc.locator("a").filter(has_text="订单分配")
+                                assign_btn_label = "订单分配"
+
                                 if assign_btn.count() == 0:
-                                    # Fallback: try "订单分配"
-                                    assign_btn = page.locator(item_selector).locator("a").filter(has_text="订单分配")
+                                    assign_btn = item_loc.locator("div:nth-child(7) a").filter(has_text="订单分配")
+
+                                if assign_btn.count() == 0:
+                                    assign_btn = item_loc.locator("div:nth-child(7) > div > a:nth-child(4)")
+
+                                if assign_btn.count() == 0:
+                                    assign_btn = item_loc.locator("a").filter(has_text="分配").filter(has_not_text="分配人员")
+                                    assign_btn_label = "分配"
+
+                                if assign_btn.count() == 0:
+                                    assign_btn = item_loc.locator("div:nth-child(7) a").filter(has_text="分配").filter(has_not_text="分配人员")
+                                    assign_btn_label = "分配"
 
                                 if assign_btn.count() > 0:
-                                    log("点击分配按钮...")
+                                    log(f"点击{assign_btn_label}按钮...")
                                     # Ensure we click the visible one if multiple
                                     btn_to_click = assign_btn.filter(has=page.locator("visible=true")).first
                                     if btn_to_click.count() > 0:
-                                        btn_to_click.click()
+                                        try:
+                                            btn_to_click.scroll_into_view_if_needed(timeout=5000)
+                                        except Exception:
+                                            pass
+                                        try:
+                                            btn_to_click.click(timeout=8000, no_wait_after=True)
+                                        except Exception:
+                                            btn_to_click.click(timeout=8000, force=True, no_wait_after=True)
                                     else:
                                         log("找到分配按钮但不加见，尝试强制点击第一个")
-                                        assign_btn.first.click()
+                                        try:
+                                            assign_btn.first.scroll_into_view_if_needed(timeout=5000)
+                                        except Exception:
+                                            pass
+                                        try:
+                                            assign_btn.first.click(timeout=8000, no_wait_after=True)
+                                        except Exception:
+                                            assign_btn.first.click(timeout=8000, force=True, no_wait_after=True)
                                     
                                     # Handle Modal
                                     try:
                                         # Wait for modal to appear
-                                        page.wait_for_selector(".modal", timeout=5000)
+                                        page.wait_for_selector("#ajaxModal", state="visible", timeout=10000)
+                                        modal = page.locator("#ajaxModal").filter(has=page.locator("visible=true")).first
                                         
                                         # Click dropdown
                                         # Try user provided ID first, then fallback to generic class
-                                        dropdown = page.locator("#select2-chosen-2")
-                                        if not dropdown.is_visible():
-                                            dropdown = page.locator(".select2-choice, .select2-selection").filter(has=page.locator("visible=true")).first
+                                        dropdown = modal.locator("#select2-chosen-2, .select2-choice, .select2-selection").filter(has=page.locator("visible=true")).first
                                         
                                         log("点击商户下拉框...")
-                                        dropdown.click()
+                                        dropdown.wait_for(state="visible", timeout=8000)
+                                        try:
+                                            dropdown.scroll_into_view_if_needed(timeout=5000)
+                                        except Exception:
+                                            pass
+                                        try:
+                                            dropdown.click(timeout=8000, no_wait_after=True)
+                                        except Exception:
+                                            dropdown.click(timeout=8000, force=True, no_wait_after=True)
                                         
                                         # Type merchant name in search box
                                         # Select2 search box usually is appended to body
-                                        search_input = page.locator(".select2-search__field, input.select2-input").filter(has=page.locator("visible=true"))
-                                        search_input.wait_for(timeout=5000)
+                                        search_input = page.locator(
+                                            ".select2-dropdown input, .select2-drop input, .select2-search input, .select2-search__field, input.select2-input"
+                                        ).filter(has=page.locator("visible=true")).first
+                                        search_input.wait_for(state="visible", timeout=8000)
                                         
                                         log(f"输入商户名称: {target_option}")
                                         search_input.fill(target_option)
@@ -400,24 +598,29 @@ class OrderScanner:
                                         # Click Confirm
                                         log("点击确定按钮...")
                                         try:
-                                            # Scope to the visible modal
-                                            visible_modal = page.locator(".modal").filter(has=page.locator("visible=true"))
-                                            if visible_modal.count() > 0:
-                                                confirm_btn = visible_modal.locator("button.btn-primary, button:has-text('确定'), button:has-text('确认'), input[value='确定'], input[value='确认']").first
-                                                if confirm_btn.count() > 0 and confirm_btn.is_visible():
-                                                    confirm_btn.click()
-                                                    log("分配操作提交完成")
-                                                else:
-                                                    log("在弹窗中未找到确定按钮")
-                                                    # Log visible buttons for debugging
-                                                    buttons = visible_modal.locator("button, input[type='button'], input[type='submit']").all_inner_texts()
-                                                    log(f"弹窗内可见按钮: {buttons}")
-                                                    raise Exception("未找到确定按钮")
+                                            ajax_confirm = modal.locator("form > div > div > div.modal-footer > button.btn.btn-primary").first
+                                            if ajax_confirm.count() > 0 and ajax_confirm.is_visible():
+                                                ajax_confirm.click(timeout=8000, no_wait_after=True)
+                                                log("分配操作提交完成")
                                             else:
-                                                 # Fallback to global search if modal structure is different
-                                                confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
-                                                confirm_btn.click()
-                                                log("分配操作提交完成 (Fallback)")
+                                                # Scope to the visible modal
+                                                visible_modal = page.locator(".modal").filter(has=page.locator("visible=true"))
+                                                if visible_modal.count() > 0:
+                                                    confirm_btn = visible_modal.locator("button.btn-primary, button:has-text('确定'), button:has-text('确认'), input[value='确定'], input[value='确认']").first
+                                                    if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                                                        confirm_btn.click(timeout=8000, no_wait_after=True)
+                                                        log("分配操作提交完成")
+                                                    else:
+                                                        log("在弹窗中未找到确定按钮")
+                                                        # Log visible buttons for debugging
+                                                        buttons = visible_modal.locator("button, input[type='button'], input[type='submit']").all_inner_texts()
+                                                        log(f"弹窗内可见按钮: {buttons}")
+                                                        raise Exception("未找到确定按钮")
+                                                else:
+                                                    # Fallback to global search if modal structure is different
+                                                    confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
+                                                    confirm_btn.click(timeout=8000, no_wait_after=True)
+                                                    log("分配操作提交完成 (Fallback)")
                                         except Exception as e:
                                             log(f"点击确定按钮失败: {e}")
                                             raise e
@@ -448,6 +651,23 @@ class OrderScanner:
 
                         except Exception as e:
                             log(f"处理订单行出错: {e}")
+
+                    try:
+                        top_items = sorted(merchant_top.items(), key=lambda x: x[1], reverse=True)[:8]
+                        top_text = ", ".join([f"{name}:{cnt}" for name, cnt in top_items]) if top_items else "无"
+                        log(
+                            "本轮扫描统计: "
+                            f"rows={scan_stats['row_total']} "
+                            f"target={scan_stats['merchant_target']} "
+                            f"non_target={scan_stats['merchant_non_target']} "
+                            f"merchant_missing={scan_stats['merchant_selector_missing']} "
+                            f"merchant_invisible={scan_stats['merchant_not_visible']} "
+                            f"order_missing={scan_stats['order_text_missing']} "
+                            f"order_empty={scan_stats['order_text_empty']} "
+                            f"merchant_top={top_text}"
+                        )
+                    except Exception:
+                        pass
                     
                     # Wait for next scan
                     if not self.stop_event.is_set():
