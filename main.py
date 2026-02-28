@@ -286,10 +286,21 @@ class OrderScanner:
                 page = context.new_page()
 
                 # Reuse login logic (accessing target_url directly might redirect to login)
-                log(f"正在访问: {url}")
+                # Strategy: Access login page first, then navigate to target URL
+                from urllib.parse import urlparse
+                parsed = urlparse(url)
+                login_url = ""
+                if parsed.scheme and parsed.netloc:
+                    login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
+                
+                log(f"准备访问: {login_url or url}")
                 resp = None
                 try:
-                    resp = page.goto(url)
+                    if login_url:
+                        log(f"优先访问登录页: {login_url}")
+                        resp = page.goto(login_url)
+                    else:
+                        resp = page.goto(url)
                 except Exception as e:
                     log(f"访问 URL 失败: {e}")
                     return
@@ -307,9 +318,7 @@ class OrderScanner:
                                 p_page.fill(pass_selector, password)
                                 p_page.press(pass_selector, "Enter")
                                 p_page.wait_for_load_state("networkidle")
-                                log("登录操作完成，正在跳转到目标页面...")
-                                p_page.goto(url)
-                                p_page.wait_for_load_state("networkidle")
+                                log("登录操作完成...")
                                 return True
                         except Exception as e:
                             log(f"自动登录尝试失败: {e}")
@@ -326,50 +335,8 @@ class OrderScanner:
                     status_code = None
                 log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
 
-                # Simple requests pre-check to debug IP blocking
-                if status_code == 405 or status_code == 403:
-                    try:
-                        import requests
-                        log("尝试使用 requests 进行连通性预检...")
-                        r = requests.get(url, allow_redirects=False, timeout=10)
-                        log(f"Requests 预检结果: status={r.status_code} location={r.headers.get('Location')}")
-                        if r.status_code == 200:
-                            log("Requests 访问正常，可能是浏览器指纹被拦截")
-                        elif r.status_code == 302:
-                            log("Requests 检测到重定向，可能是未登录")
-                        else:
-                            log("Requests 访问也异常，可能是 IP 被封禁")
-                    except Exception as e:
-                        log(f"Requests 预检失败: {e}")
- 
-                 # Initial Login Check
-                 try:
-                    # Check if we need to handle 405 by switching to login page first
-                    # Monitor script uses 'r=statistics.interface_log' which works, but 'r=order.list.status1' might be blocked
-                    # If 405, we try to navigate to login page, just like we would if we were redirected
-                    
-                    status_code = 0
-                    try:
-                        # Check status code from last navigation if possible, or just check title
-                        title = page.title()
-                        if "405" in title:
-                             status_code = 405
-                    except:
-                        pass
-
-                    if status_code == 405:
-                         log("检测到 405，尝试先打开登录页...")
-                         try:
-                             from urllib.parse import urlparse
-                             parsed = urlparse(url)
-                             if parsed.scheme and parsed.netloc:
-                                 login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login&"
-                                 # Use same goto strategy as monitor.py
-                                 page.goto(login_url)
-                                 page.wait_for_load_state("networkidle")
-                         except:
-                             pass
-
+                # Initial Login Check
+                try:
                     # Try to find login form
                     try:
                         page.wait_for_selector("#form1", timeout=5000)
@@ -379,9 +346,15 @@ class OrderScanner:
                         
                     # After potential login, ensure we are at the target URL
                     if "order.list.status1" not in page.url:
-                        log(f"当前不在订单列表页，跳转: {url}")
-                        page.goto(url)
+                        log(f"正在跳转到订单列表页: {url}")
+                        resp = page.goto(url)
                         page.wait_for_load_state("networkidle")
+                        
+                        # Update status code after jump
+                        try:
+                             if resp: status_code = resp.status
+                        except: status_code = None
+                        log(f"跳转后页面: {page.url} | 状态码: {status_code}")
                         
                 except Exception as e:
                     log(f"初始化页面/登录流程出错: {e}")
