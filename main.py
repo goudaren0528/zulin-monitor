@@ -277,137 +277,87 @@ class OrderScanner:
         
         try:
             with sync_playwright() as p:
-                # args = ["--window-position=0,0"] if not headless else []
-                # Remove window hiding to allow user to see the browser
-                args = [] 
+                args = []
                 browser = p.chromium.launch(headless=headless, args=args)
                 
                 context = browser.new_context()
                 page = context.new_page()
 
-                # Reuse login logic (accessing target_url directly might redirect to login)
-                # Strategy: Mimic monitor.py exactly - access a safe URL first
-                # monitor.py accesses 'r=statistics.interface_log' which works fine
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
-                
-                # Use the exact same URL pattern as monitor.py, just different route
-                safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
-                
-                log(f"准备访问安全入口 (参考 monitor.py): {safe_entry_url}")
+                base_url = f"{parsed.scheme}://{parsed.netloc}" if parsed.scheme and parsed.netloc else ""
+                shop_url = f"{base_url}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=shop" if base_url else ""
+
                 resp = None
                 try:
-                    # Access the safe URL first - this should trigger login page if not authenticated
-                    # And it is KNOWN to not be 405 blocked (since monitor works)
-                    resp = page.goto(safe_entry_url)
+                    if shop_url:
+                        log(f"准备访问入口: {shop_url}")
+                        resp = page.goto(shop_url)
+                    else:
+                        log(f"准备访问入口: {url}")
+                        resp = page.goto(url)
                     page.wait_for_load_state("networkidle")
-                        
                 except Exception as e:
-                    log(f"访问安全入口失败: {e}")
-                    # Keep going to try login detection
+                    log(f"访问入口失败: {e}")
+                    return
 
-
-                # Helper for login
-                def perform_login(p_page):
-                    if username and password:
-                        user_selector = "#form1 > div > div:nth-child(3) > input"
-                        pass_selector = "#form1 > div > div:nth-child(4) > input"
-                        try:
-                            # Check if login form exists
-                            if p_page.locator(user_selector).count() > 0:
-                                log("检测到登录页面，开始自动登录...")
-                                p_page.fill(user_selector, username)
-                                p_page.fill(pass_selector, password)
-                                p_page.press(pass_selector, "Enter")
-                                p_page.wait_for_load_state("networkidle")
-                                log("登录操作完成...")
-                                return True
-                        except Exception as e:
-                            log(f"自动登录尝试失败: {e}")
+                def perform_login():
+                    if not (username and password):
+                        return False
+                    user_selector = "#form1 > div > div:nth-child(3) > input"
+                    pass_selector = "#form1 > div > div:nth-child(4) > input"
+                    try:
+                        if page.locator(user_selector).count() > 0:
+                            log("检测到登录页面，开始自动登录...")
+                            page.fill(user_selector, username)
+                            page.fill(pass_selector, password)
+                            page.press(pass_selector, "Enter")
+                            page.wait_for_load_state("networkidle")
+                            log("登录操作完成")
+                            return True
+                    except Exception as e:
+                        log(f"自动登录尝试失败: {e}")
                     return False
 
-                # Check current page state
-                current_url = page.url
-                page_title = page.title()
                 status_code = None
                 try:
-                    if resp:
-                        status_code = resp.status
+                    status_code = resp.status if resp else None
                 except Exception:
                     status_code = None
-                log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
-
-                # Initial Login Check
                 try:
-                    # Try to find login form
-                    try:
-                        page.wait_for_selector("#form1", timeout=5000)
-                        perform_login(page)
-                    except:
-                        pass # Not on login page
-                        
-                    # After potential login, ensure we are at the target URL
-                    # If direct jump fails with 405, try to navigate via UI
-                    if "order.list.status1" not in page.url:
-                        # First try: Direct jump
-                        log(f"尝试跳转到订单列表页: {url}")
-                        resp = page.goto(url)
+                    log(f"当前页面: {page.url} | 标题: {page.title()} | 状态码: {status_code}")
+                except Exception:
+                    log(f"当前页面状态码: {status_code}")
+
+                try:
+                    if page.locator("#form1").count() > 0:
+                        perform_login()
+                except Exception:
+                    pass
+
+                try:
+                    if shop_url and "r=shop" not in page.url:
+                        page.goto(shop_url)
                         page.wait_for_load_state("networkidle")
-                        
-                        try:
-                             if resp: status_code = resp.status
-                        except: status_code = None
-                        log(f"跳转后页面: {page.url} | 状态码: {status_code}")
-                        
-                        # Second try: If 405, try clicking menus based on user guidance
-                        if status_code == 405:
-                            log("跳转遭遇 405，尝试通过分步点击菜单进入...")
-                            try:
-                                # Step 1: Go back to a safe page (e.g. login landing page or home)
-                                # If we are on 405 page, there are no menus.
-                                # But perform_login() ends at login_url, and if it redirects to home, we are good.
-                                # If it stayed on login_url (which is empty?), we might need to go to root
-                                
-                                # Try to go to root first if we are stuck
-                                from urllib.parse import urlparse
-                                parsed = urlparse(url)
-                                root_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=shop"
-                                log(f"先访问店铺首页以加载菜单: {root_url}")
-                                page.goto(root_url)
-                                page.wait_for_load_state("networkidle")
-                                
-                                # Step 2: Click Top Level Menu: #navheight > li:nth-child(5) > a (Usually "Order" or "Application")
-                                log("点击一级菜单 (#navheight > li:nth-child(5) > a)...")
-                                page.click("#navheight > li:nth-child(5) > a")
-                                page.wait_for_load_state("networkidle")
-                                
-                                # Step 3: Click Sub Menu Group: body > div.wb-subnav > div > div:nth-child(4)
-                                # Note: This might be a header or container, ensure it's clickable or just a container for next step
-                                log("等待二级菜单容器加载...")
-                                page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
-                                
-                                # Step 4: Click Final Link: body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a
-                                log("点击三级菜单 (body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a)...")
-                                page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
-                                page.wait_for_load_state("networkidle")
-                                
-                                log(f"点击导航后页面: {page.url}")
-                                
-                            except Exception as nav_e:
-                                log(f"UI 分步导航失败: {nav_e}")
-                                # Fallback to heuristic search if specific selectors fail
-                                try:
-                                    log("尝试模糊匹配 '订单' 链接...")
-                                    page.get_by_role("link", name="订单").first.click()
-                                    page.wait_for_load_state("networkidle")
-                                except:
-                                    pass
+                except Exception:
+                    pass
 
+                try:
+                    log("点击一级菜单 (#navheight > li:nth-child(5) > a)...")
+                    page.click("#navheight > li:nth-child(5) > a")
+                    page.wait_for_load_state("networkidle")
+                    page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
+                    log("点击三级菜单 (body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a)...")
+                    page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
+                    page.wait_for_load_state("networkidle")
                 except Exception as e:
-                    log(f"初始化页面/登录流程出错: {e}")
-                    pass # Proceed to loop to let it retry or fail gracefully
+                    log(f"菜单导航失败: {e}")
 
-                log("检测到目标页面，开始执行自动化流程...")
+                try:
+                    status_code = 405 if "405" in page.title() else status_code
+                    log(f"导航后页面: {page.url} | 标题: {page.title()} | 状态码: {status_code}")
+                except Exception:
+                    pass
                 
                 key_selector = "#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')"
                 while not self.stop_event.is_set():
@@ -426,12 +376,36 @@ class OrderScanner:
                             log("5秒后将尝试重新加载...")
                             self.stop_event.wait(5)
                             try:
-                                resp = page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                                try:
-                                    page.wait_for_load_state("networkidle", timeout=15000)
-                                except Exception:
-                                    pass
-                                status_code = resp.status if resp else None
+                                if status_code == 405 and shop_url:
+                                    page.goto(shop_url)
+                                    page.wait_for_load_state("networkidle")
+                                    try:
+                                        if page.locator("#form1").count() > 0:
+                                            perform_login()
+                                    except Exception:
+                                        pass
+                                    try:
+                                        page.click("#navheight > li:nth-child(5) > a")
+                                        page.wait_for_load_state("networkidle")
+                                        page.wait_for_selector("body > div.wb-subnav > div > div:nth-child(4)", timeout=5000)
+                                        page.click("body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a")
+                                        page.wait_for_load_state("networkidle")
+                                    except Exception:
+                                        pass
+                                    try:
+                                        status_code = 405 if "405" in page.title() else None
+                                    except Exception:
+                                        status_code = None
+                                else:
+                                    resp = page.reload(timeout=60000)
+                                    try:
+                                        page.wait_for_load_state("networkidle", timeout=15000)
+                                    except Exception:
+                                        pass
+                                    try:
+                                        status_code = resp.status if resp else None
+                                    except Exception:
+                                        status_code = None
                             except Exception:
                                 status_code = None
                             try:

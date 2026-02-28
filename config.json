@@ -1,6 +1,6 @@
 {
     "common": {
-        "headless": true,
+        "headless": false,
         "password": "Test0528.",
         "username": "伟填"
     },
