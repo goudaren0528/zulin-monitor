@@ -1,8 +1,8 @@
 {
     "common": {
         "headless": true,
-        "password": "Test0528.",
-        "username": "伟填"
+        "password": "YOUR_PASSWORD_HERE",
+        "username": "YOUR_USERNAME_HERE"
     },
     "interface_monitor": {
         "headless": true,
@@ -34,7 +34,7 @@
         ],
         "scan_interval": 43200,
         "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log",
-        "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+        "webhook_url": "YOUR_WEBHOOK_URL_HERE"
     },
     "order_scanner": {
         "keyword_mapping": {
@@ -67,7 +67,9 @@
         "rpa_group_mapping": {
             "星享生活": "星享生活米奇支付宝入驻"
         },
-        "scan_interval": 30,
+        "scan_interval": 120,
+        "scan_interval_min": 120,
+        "scan_interval_max": 300,
         "skip_merchants": [
             "活力租赁",
             "深圳活力租赁"
@@ -78,13 +80,13 @@
                 "targets": [
                     "*"
                 ],
-                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+                "url": "YOUR_WEBHOOK_URL_HERE"
             },
             {
                 "targets": [
                     "米奇租赁官方"
                 ],
-                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833"
+                "url": "YOUR_WEBHOOK_URL_HERE"
             }
         ]
     },

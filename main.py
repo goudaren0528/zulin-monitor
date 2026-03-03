@@ -114,6 +114,90 @@ def _extract_merchant_from_text(block_text):
         return None
     return None
 
+def _parse_chromium_major(version_text, default_major=120):
+    import re
+
+    s = "" if version_text is None else str(version_text)
+    m = re.search(r"(\d+)\.", s)
+    if not m:
+        m = re.search(r"\b(\d+)\b", s)
+    if not m:
+        return default_major
+    try:
+        return int(m.group(1))
+    except Exception:
+        return default_major
+
+def _default_user_agent(chrome_major):
+    major = chrome_major if chrome_major else 120
+    return (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        f"Chrome/{major}.0.0.0 Safari/537.36"
+    )
+
+def _default_extra_http_headers(chrome_major):
+    major = chrome_major if chrome_major else 120
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "DNT": "1",
+        "Cache-Control": "max-age=0",
+        "Pragma": "no-cache",
+        "Sec-CH-UA": f"\"Chromium\";v=\"{major}\", \"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"{major}\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+    }
+
+def _default_init_script():
+    return """
+(() => {
+  try {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'language', { get: () => 'zh-CN' });
+    Object.defineProperty(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en'] });
+  } catch (e) {}
+})();
+""".strip()
+
+def _coerce_float(val):
+    if val is None:
+        return None
+    try:
+        return float(val)
+    except Exception:
+        return None
+
+def _pick_interval_seconds(fallback_seconds, min_seconds, max_seconds):
+    fb = _coerce_float(fallback_seconds)
+    if fb is None:
+        fb = 0.0
+
+    mn = _coerce_float(min_seconds)
+    mx = _coerce_float(max_seconds)
+
+    if mn is None and mx is None:
+        return fb
+    if mn is None:
+        mn = fb
+    if mx is None:
+        mx = fb
+
+    if mn < 0:
+        mn = 0.0
+    if mx < 0:
+        mx = 0.0
+    if mx < mn:
+        mn, mx = mx, mn
+    if mx == mn:
+        return mn
+
+    import random
+
+    if mn.is_integer() and mx.is_integer():
+        return float(random.randint(int(mn), int(mx)))
+    return float(random.uniform(mn, mx))
+
 class OrderScanner:
     def __init__(self):
         self.config = {}
@@ -123,12 +207,18 @@ class OrderScanner:
         self.load_config()
 
     def load_config(self):
-        config_path = "config.json"
-        if not os.path.exists(config_path):
-            log(f"错误: 找不到配置文件 {config_path}")
+        candidates = ["config.local.json", "config.json"]
+        config_path = None
+        for pth in candidates:
+            if os.path.exists(pth):
+                config_path = pth
+                break
+        if not config_path:
+            log("错误: 找不到配置文件 config.local.json 或 config.json")
             return False
         
         try:
+            log(f"使用配置文件: {config_path}")
             with open(config_path, 'r', encoding='utf-8') as f:
                 raw_config = json.load(f)
             
@@ -271,46 +361,93 @@ class OrderScanner:
         password = self.get_config("password", "")
         keyword_mapping = self.get_config("keyword_mapping", {})
         scan_interval = self.get_config("scan_interval", 30)
+        scan_interval_min = self.get_config("scan_interval_min", None)
+        scan_interval_max = self.get_config("scan_interval_max", None)
         headless = self.get_config("headless", True)
 
         log(f"启动浏览器... (Headless: {headless})")
         
         try:
             with sync_playwright() as p:
+                base_args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--lang=zh-CN",
+                ]
+                config_args = self.get_config("chromium_args", [])
+                if not isinstance(config_args, list):
+                    config_args = []
                 args = []
-                browser = p.chromium.launch(headless=headless, args=args)
+                for a in base_args + config_args:
+                    if isinstance(a, str) and a and a not in args:
+                        args.append(a)
+
+                channel = self.get_config("browser_channel", None)
+                try:
+                    if channel:
+                        browser = p.chromium.launch(headless=headless, args=args, channel=channel)
+                    else:
+                        browser = p.chromium.launch(headless=headless, args=args)
+                except Exception:
+                    browser = p.chromium.launch(headless=headless, args=args)
 
                 storage_state_path = self.get_config("storage_state_path", "")
+                if not storage_state_path:
+                    storage_state_path = "storage_state_order_scanner.json"
+                chrome_major = None
+                try:
+                    version_val = getattr(browser, "version", None)
+                    if callable(version_val):
+                        version_val = version_val()
+                    chrome_major = _parse_chromium_major(version_val)
+                except Exception:
+                    chrome_major = None
+
+                user_agent = self.get_config("user_agent", None) or _default_user_agent(chrome_major)
+                locale = self.get_config("locale", "zh-CN") or "zh-CN"
+                timezone_id = self.get_config("timezone_id", "Asia/Shanghai") or "Asia/Shanghai"
+                viewport = self.get_config("viewport", {"width": 1920, "height": 1080})
+                if not isinstance(viewport, dict) or "width" not in viewport or "height" not in viewport:
+                    viewport = {"width": 1920, "height": 1080}
+                screen = self.get_config("screen", viewport)
+                if not isinstance(screen, dict) or "width" not in screen or "height" not in screen:
+                    screen = viewport
+                device_scale_factor = self.get_config("device_scale_factor", 1)
+                try:
+                    device_scale_factor = float(device_scale_factor)
+                except Exception:
+                    device_scale_factor = 1
+                color_scheme = self.get_config("color_scheme", "light") or "light"
+                extra_http_headers = self.get_config("extra_http_headers", None)
+                if not isinstance(extra_http_headers, dict):
+                    extra_http_headers = _default_extra_http_headers(chrome_major)
+                init_script = self.get_config("init_script", None) or _default_init_script()
+
                 context_options = {
-                    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "viewport": {"width": 1920, "height": 1080},
-                    "locale": "zh-CN",
-                    "timezone_id": "Asia/Shanghai",
+                    "user_agent": user_agent,
+                    "viewport": viewport,
+                    "screen": screen,
+                    "device_scale_factor": device_scale_factor,
+                    "locale": locale,
+                    "timezone_id": timezone_id,
+                    "color_scheme": color_scheme,
                 }
                 if storage_state_path and os.path.exists(storage_state_path):
                     context_options["storage_state"] = storage_state_path
 
                 context = browser.new_context(**context_options)
-                context.set_extra_http_headers({
-                    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                })
-                context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
+                try:
+                    context.set_extra_http_headers(extra_http_headers)
+                except Exception:
+                    pass
+                try:
+                    context.add_init_script(init_script)
+                except Exception:
+                    context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
                 page = context.new_page()
 
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
-                
-                safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
-
-                resp = None
-                try:
-                    log(f"准备访问安全入口 (Monitor同款): {safe_entry_url}")
-                    resp = page.goto(safe_entry_url)
-                    page.wait_for_load_state("networkidle")
-                except Exception as e:
-                    log(f"访问入口失败: {e}")
-                    return
+                login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login"
 
                 def perform_login():
                     if not (username and password):
@@ -325,145 +462,16 @@ class OrderScanner:
                             page.press(pass_selector, "Enter")
                             page.wait_for_load_state("networkidle")
                             log("登录操作完成")
+                            try:
+                                if storage_state_path:
+                                    context.storage_state(path=storage_state_path)
+                                    log(f"已保存登录态: {storage_state_path}")
+                            except Exception as e:
+                                log(f"保存登录态失败: {e}")
                             return True
                     except Exception as e:
                         log(f"自动登录尝试失败: {e}")
                     return False
-
-                status_code = None
-                try:
-                    status_code = resp.status if resp else None
-                except Exception:
-                    status_code = None
-                try:
-                    log(f"当前页面: {page.url} | 标题: {page.title()} | 状态码: {status_code}")
-                except Exception:
-                    log(f"当前页面状态码: {status_code}")
-
-                try:
-                    if page.locator("#form1").count() > 0:
-                        perform_login()
-                except Exception:
-                    pass
-
-                try:
-                    title = page.title()
-                    if "405" in title:
-                        log("入口页面返回 405，尝试直接访问登录页...")
-                        login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login"
-                        page.goto(login_url)
-                        page.wait_for_load_state("networkidle")
-
-                    if "order.list.status1" not in page.url:
-                        log(f"登录后直接跳转订单页: {url}")
-                        page.goto(url)
-                        page.wait_for_load_state("networkidle")
-                except Exception as e:
-                    log(f"导航逻辑异常: {e}")
-
-                try:
-                    status_code = 405 if "405" in page.title() else status_code
-                    log(f"导航后页面: {page.url} | 标题: {page.title()} | 状态码: {status_code}")
-                except Exception:
-                    pass
-                
-                key_selector = "#myTab, .nav-tabs, ul.nav, a:has-text('待审核'), a:has-text('待发货')"
-                while not self.stop_event.is_set():
-                    try:
-                        if status_code is not None and status_code >= 400:
-                            try:
-                                snippet = _truncate_text(page.content(), 600)
-                                log(f"页面异常响应: {status_code} content={snippet}")
-                            except Exception:
-                                pass
-                            try:
-                                page.screenshot(path="debug_last_page.png", full_page=True)
-                                log("已保存页面截图: debug_last_page.png")
-                            except Exception:
-                                pass
-                            log("5秒后将尝试重新加载...")
-                            self.stop_event.wait(5)
-                            try:
-                                if status_code == 405:
-                                    page.goto(safe_entry_url)
-                                    page.wait_for_load_state("networkidle")
-                                    try:
-                                        if page.locator("#form1").count() > 0:
-                                            perform_login()
-                                    except Exception:
-                                        pass
-                                    try:
-                                        if "order.list.status1" not in page.url:
-                                            page.goto(url)
-                                            page.wait_for_load_state("networkidle")
-                                    except Exception:
-                                        pass
-                                    try:
-                                        status_code = 405 if "405" in page.title() else None
-                                    except Exception:
-                                        status_code = None
-                                else:
-                                    resp = page.reload(timeout=60000)
-                                    try:
-                                        page.wait_for_load_state("networkidle", timeout=15000)
-                                    except Exception:
-                                        pass
-                                    try:
-                                        status_code = resp.status if resp else None
-                                    except Exception:
-                                        status_code = None
-                            except Exception:
-                                status_code = None
-                            try:
-                                current_url = page.url
-                                page_title = page.title()
-                                log(f"当前页面: {current_url} | 标题: {page_title} | 状态码: {status_code}")
-                            except Exception:
-                                pass
-                            continue
-
-                        log("等待页面关键元素...")
-                        ready = False
-                        for _ in range(12):
-                            if self.stop_event.is_set():
-                                break
-                            try:
-                                page.wait_for_selector(key_selector, timeout=5000, state="visible")
-                                ready = True
-                                break
-                            except Exception:
-                                continue
-                        if ready:
-                            break
-
-                        try:
-                            snippet = _truncate_text(page.content(), 600)
-                            log(f"等待关键元素超时 content={snippet}")
-                        except Exception:
-                            log("等待关键元素超时")
-                        try:
-                            page.screenshot(path="debug_last_page.png", full_page=True)
-                            log("已保存页面截图: debug_last_page.png")
-                        except Exception:
-                            pass
-                        log("5秒后将尝试重新加载...")
-                        self.stop_event.wait(5)
-                        try:
-                            page.reload(timeout=60000)
-                        except Exception:
-                            try:
-                                page.goto(url, timeout=60000, wait_until="domcontentloaded")
-                            except Exception:
-                                pass
-                        continue
-                    except Exception as e:
-                        log(f"页面初始化阶段异常: {e}")
-                        log("5秒后将尝试重新加载...")
-                        self.stop_event.wait(5)
-                        try:
-                            page.reload(timeout=60000)
-                        except Exception:
-                            pass
 
                 if self.stop_event.is_set():
                     try:
@@ -472,7 +480,111 @@ class OrderScanner:
                         pass
                     return
 
-                log("检测到目标页面，开始执行自动化流程...")
+                def _safe_page_state():
+                    try:
+                        return f"url={page.url} title={page.title()}"
+                    except Exception:
+                        return "url=<unknown> title=<unknown>"
+
+                def _click_nav(selector, label, timeout_ms=20000, wait_networkidle=True):
+                    selectors = selector if isinstance(selector, (list, tuple)) else [selector]
+                    last_err = None
+                    for sel in selectors:
+                        try:
+                            log(f"导航点击准备: {label} selector={sel} {_safe_page_state()}")
+                            loc = page.locator(sel).first
+                            loc.wait_for(state="visible", timeout=timeout_ms)
+                            try:
+                                loc.click()
+                            except Exception:
+                                try:
+                                    loc.scroll_into_view_if_needed(timeout=timeout_ms)
+                                except Exception:
+                                    pass
+                                loc.click(force=True)
+                            log(f"导航点击完成: {label} selector={sel} {_safe_page_state()}")
+                            if wait_networkidle:
+                                try:
+                                    page.wait_for_load_state("networkidle", timeout=timeout_ms)
+                                except Exception:
+                                    pass
+                            log(f"导航等待完成: {label} selector={sel} {_safe_page_state()}")
+                            return
+                        except Exception as e:
+                            last_err = e
+                    raise last_err if last_err else Exception("click failed")
+
+                def navigate_to_pending_review():
+                    nonlocal page
+                    max_attempts = 3
+                    for attempt in range(1, max_attempts + 1):
+                        if self.stop_event.is_set():
+                            return False
+                        try:
+                            try:
+                                if page.is_closed():
+                                    page = context.new_page()
+                                    log("检测到页面已关闭，已重建新页面")
+                            except Exception:
+                                pass
+                            log(f"准备访问登录页: {login_url}")
+                            page.goto(login_url, timeout=60000, wait_until="domcontentloaded")
+                            try:
+                                page.wait_for_load_state("networkidle", timeout=20000)
+                            except Exception:
+                                pass
+                            log(f"登录页加载完成 {_safe_page_state()}")
+
+                            try:
+                                if page.locator("#form1").count() > 0:
+                                    perform_login()
+                                else:
+                                    log("未检测到登录表单，可能已处于登录态，跳过登录")
+                            except Exception:
+                                pass
+                            log(f"登录流程结束 {_safe_page_state()}")
+
+                            _click_nav("#navheight > li:nth-child(5) > a", "订单菜单")
+                            _click_nav("body > div.wb-subnav > div > div:nth-child(4)", "订单列表菜单")
+                            _click_nav(
+                                [
+                                    "body > div.wb-subnav > div > ul:nth-child(5) > li:nth-child(1) > a",
+                                    "body > div.wb-subnav > div > ul:nth-child(5) > li.menu_web.active > a",
+                                ],
+                                "订单列表",
+                                timeout_ms=30000,
+                            )
+                            try:
+                                page.wait_for_selector("#table", timeout=60000, state="visible")
+                            except Exception:
+                                pass
+                            log(f"订单列表页面就绪 {_safe_page_state()}")
+                            try:
+                                if storage_state_path:
+                                    context.storage_state(path=storage_state_path)
+                                    log(f"已刷新保存登录态: {storage_state_path}")
+                            except Exception:
+                                pass
+                            return True
+                        except Exception as e:
+                            log(f"导航到待审核页失败 (attempt={attempt}/{max_attempts}): {e}")
+                            log(f"失败现场 {_safe_page_state()}")
+                            try:
+                                page.screenshot(path="debug_last_page.png", full_page=True)
+                                log("已保存页面截图: debug_last_page.png")
+                            except Exception:
+                                pass
+                            self.stop_event.wait(5)
+                    return False
+
+                if not navigate_to_pending_review():
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+                    return
+
+                log("已进入待审核页面，开始执行自动化流程...")
 
                 while not self.stop_event.is_set():
                     log(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
@@ -511,8 +623,9 @@ class OrderScanner:
                             pass
 
                     if found_count:
-                        log(f"待审核数量为 0，等待 {scan_interval} 秒后重试...")
-                        self.stop_event.wait(scan_interval)
+                        wait_seconds = _pick_interval_seconds(scan_interval, scan_interval_min, scan_interval_max)
+                        log(f"待审核数量为 0，等待 {wait_seconds:.1f} 秒后重试...")
+                        self.stop_event.wait(wait_seconds)
                         log("正在刷新页面...")
                         try:
                             page.reload(timeout=60000)
@@ -828,8 +941,9 @@ class OrderScanner:
                             log(f"本轮已处理 {processed_count} 个订单，立即刷新页面继续...")
                             self.stop_event.wait(2)
                         else:
-                            log(f"本轮结束，等待 {scan_interval} 秒...")
-                            self.stop_event.wait(scan_interval)
+                            wait_seconds = _pick_interval_seconds(scan_interval, scan_interval_min, scan_interval_max)
+                            log(f"本轮结束，等待 {wait_seconds:.1f} 秒...")
+                            self.stop_event.wait(wait_seconds)
                         
                         try:
                             page.reload()
