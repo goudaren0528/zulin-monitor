@@ -448,6 +448,7 @@ class OrderScanner:
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
                 login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login"
+                safe_entry_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log"
 
                 def perform_login():
                     if not (username and password):
@@ -527,21 +528,50 @@ class OrderScanner:
                                     log("检测到页面已关闭，已重建新页面")
                             except Exception:
                                 pass
-                            log(f"准备访问登录页: {login_url}")
-                            page.goto(login_url, timeout=60000, wait_until="domcontentloaded")
-                            try:
-                                page.wait_for_load_state("networkidle", timeout=20000)
-                            except Exception:
-                                pass
-                            log(f"登录页加载完成 {_safe_page_state()}")
+                            def _goto_with_status(go_url, label):
+                                log(f"准备访问{label}: {go_url}")
+                                r = page.goto(go_url, timeout=60000, wait_until="domcontentloaded")
+                                try:
+                                    page.wait_for_load_state("networkidle", timeout=20000)
+                                except Exception:
+                                    pass
+                                s = None
+                                try:
+                                    s = r.status if r else None
+                                except Exception:
+                                    s = None
+                                log(f"{label}加载完成 status={s} {_safe_page_state()}")
+                                return r, s
+
+                            resp, status_code = _goto_with_status(login_url, "登录页")
 
                             try:
-                                if page.locator("#form1").count() > 0:
-                                    perform_login()
-                                else:
-                                    log("未检测到登录表单，可能已处于登录态，跳过登录")
+                                title_val = page.title()
                             except Exception:
-                                pass
+                                title_val = ""
+                            is_405 = (status_code == 405) or ("405" in str(title_val))
+                            if is_405:
+                                fallback_urls = [
+                                    safe_entry_url,
+                                    f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web",
+                                    f"{parsed.scheme}://{parsed.netloc}/web/",
+                                ]
+                                for idx, fb_url in enumerate(fallback_urls, start=1):
+                                    resp, status_code = _goto_with_status(fb_url, f"入口页#{idx}")
+                                    try:
+                                        title_val = page.title()
+                                    except Exception:
+                                        title_val = ""
+                                    is_405 = (status_code == 405) or ("405" in str(title_val))
+                                    if not is_405:
+                                        break
+                                if is_405:
+                                    raise Exception(f"页面返回405，疑似被风控/反爬拦截 status={status_code} title={title_val}")
+
+                            if page.locator("#form1").count() > 0:
+                                perform_login()
+                            else:
+                                log("未检测到登录表单，可能已处于登录态，跳过登录")
                             log(f"登录流程结束 {_safe_page_state()}")
 
                             _click_nav("#navheight > li:nth-child(5) > a", "订单菜单")
