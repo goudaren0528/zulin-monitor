@@ -60,6 +60,8 @@
         "scan_interval": 7200,
         "webhook_url": "YOUR_WEBHOOK_URL_HERE",
         "headless": false,
+        "auto_update_threshold": true,
+        "threshold_step_ratio": 0.2,
         "items": [
             { "name": "E签宝静默签人脸", "threshold": 100 },
             { "name": "E签宝静默签合同", "threshold": 100 },

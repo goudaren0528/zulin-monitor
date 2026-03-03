@@ -21,18 +21,26 @@ def monitor_log(message):
 class InterfaceMonitor:
     def __init__(self):
         self.config = {}
+        self.config_path = None
         self.running = False
         self.thread = None
         self.stop_event = threading.Event()
         self.load_config()
 
     def load_config(self):
-        config_path = "config.json"
-        if not os.path.exists(config_path):
-            monitor_log(f"错误: 找不到配置文件 {config_path}")
+        candidates = ["config.local.json", "config.json"]
+        config_path = None
+        for pth in candidates:
+            if os.path.exists(pth):
+                config_path = pth
+                break
+        if not config_path:
+            monitor_log("错误: 找不到配置文件 config.local.json 或 config.json")
             return False
         
         try:
+            self.config_path = config_path
+            monitor_log(f"使用配置文件: {config_path}")
             with open(config_path, 'r', encoding='utf-8') as f:
                 raw_config = json.load(f)
             
@@ -82,7 +90,7 @@ class InterfaceMonitor:
         
         if not webhook_url:
             monitor_log("未配置 Webhook URL，无法发送通知")
-            return
+            return False
 
         try:
             payload = {
@@ -93,8 +101,49 @@ class InterfaceMonitor:
             }
             resp = requests.post(webhook_url, json=payload)
             monitor_log(f"-> 告警通知已发送，状态码: {resp.status_code}")
+            return resp.status_code >= 200 and resp.status_code < 300
         except Exception as e:
             monitor_log(f"-> 告警通知发送失败: {e}")
+            return False
+
+    def update_item_thresholds(self, updates):
+        if not updates:
+            return False
+        if not self.config_path or not os.path.exists(self.config_path):
+            monitor_log("无法更新阈值：未找到配置文件路径")
+            return False
+        try:
+            with open(self.config_path, 'r', encoding='utf-8') as f:
+                raw_config = json.load(f)
+            monitor_config = raw_config.get("interface_monitor", {})
+            items = monitor_config.get("items", [])
+            if not isinstance(items, list):
+                items = []
+
+            changed = False
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                name = item.get("name")
+                if name in updates:
+                    new_threshold = updates[name]
+                    if isinstance(new_threshold, int) and new_threshold >= 0:
+                        if item.get("threshold") != new_threshold:
+                            item["threshold"] = new_threshold
+                            changed = True
+
+            if not changed:
+                return False
+
+            raw_config["interface_monitor"] = monitor_config
+            with open(self.config_path, 'w', encoding='utf-8') as f:
+                json.dump(raw_config, f, ensure_ascii=False, indent=4)
+            monitor_log(f"已增量更新阈值: {updates}")
+            self.load_config()
+            return True
+        except Exception as e:
+            monitor_log(f"更新阈值失败: {e}")
+            return False
 
     def _run_loop(self):
         # Shared login credentials
@@ -192,10 +241,14 @@ class InterfaceMonitor:
 
                         # Config Items
                         monitor_items = self.get_config("items", [])
-                        target_items_map = {item["name"]: item.get("threshold", 100) for item in monitor_items}
+                        target_items_map = {item.get("name"): item for item in monitor_items if isinstance(item, dict) and item.get("name")}
+                        auto_update_threshold = bool(self.get_config("auto_update_threshold", True))
+                        global_step = self.get_config("threshold_step", None)
+                        global_step_ratio = self.get_config("threshold_step_ratio", 0.2)
 
                         # Robust parsing strategy: Find all 'Available' labels and trace back to their card containers
                         items_to_notify = []
+                        threshold_updates = {}
                         processed_cards = set()
                         
                         # Find all elements containing "可用条数"
@@ -294,7 +347,8 @@ class InterfaceMonitor:
                                     monitor_log(f"----------------")
                                     continue
 
-                                current_threshold = target_items_map[matched_name]
+                                item_cfg = target_items_map.get(matched_name, {})
+                                current_threshold = item_cfg.get("threshold", 100)
                                 name_line = matched_name # Use the matched config name for display
 
                                 # Regex for different fields within this card
@@ -316,6 +370,24 @@ class InterfaceMonitor:
                                     
                                     if avail_count < current_threshold:
                                         items_to_notify.append(f"【{name_line}】 剩余: {avail_count} 条 (阈值: {current_threshold})")
+                                        if auto_update_threshold:
+                                            step_val = item_cfg.get("step", None)
+                                            step_ratio = item_cfg.get("step_ratio", None)
+                                            step = None
+                                            try:
+                                                if step_val is not None:
+                                                    step = int(step_val)
+                                                elif step_ratio is not None:
+                                                    step = max(1, int(round(float(current_threshold) * float(step_ratio))))
+                                                elif global_step is not None:
+                                                    step = int(global_step)
+                                                else:
+                                                    step = max(1, int(round(float(current_threshold) * float(global_step_ratio))))
+                                            except Exception:
+                                                step = max(1, int(round(float(current_threshold) * 0.2)))
+                                            new_threshold = max(0, int(avail_count) - int(step))
+                                            if new_threshold < int(current_threshold):
+                                                threshold_updates[name_line] = new_threshold
                                 else:
                                     if not (balance_match or consumed_match):
                                             monitor_log(f"未能解析接口数据: {name_line}")
@@ -329,7 +401,12 @@ class InterfaceMonitor:
                             # monitor_log(f"页面文本片段: {page.locator(container_selector).inner_text()[:200]}")
 
                         if items_to_notify:
-                            self.send_notification("\n".join(items_to_notify))
+                            ok = self.send_notification("\n".join(items_to_notify))
+                            if threshold_updates:
+                                if ok:
+                                    self.update_item_thresholds(threshold_updates)
+                                else:
+                                    monitor_log(f"告警发送失败，跳过阈值更新: {threshold_updates}")
                             
                     except Exception as e:
                         monitor_log(f"监控逻辑出错: {e}")

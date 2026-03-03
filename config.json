@@ -6,6 +6,8 @@
     },
     "interface_monitor": {
         "headless": true,
+        "auto_update_threshold": true,
+        "threshold_step_ratio": 0.2,
         "items": [
             {
                 "name": "E签宝静默签人脸",
