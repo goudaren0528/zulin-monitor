@@ -28,4 +28,4 @@ ENV PYTHONUNBUFFERED=1 \
     ORDER_POINT_HEADED=1
 
 # Run Flask app
-CMD ["bash", "-lc", "set -euo pipefail; if [ -z \"${VNC_PASSWORD:-}\" ]; then echo \"VNC_PASSWORD is required\" >&2; exit 2; fi; Xvfb :99 -screen 0 1920x1080x24 -ac -nolisten tcp -dpi 96 & fluxbox -display :99 & x11vnc -storepasswd \"$VNC_PASSWORD\" /tmp/x11vnc.pass >/dev/null; x11vnc -display :99 -rfbport 5900 -rfbauth /tmp/x11vnc.pass -forever -shared -repeat -noxdamage -listen 0.0.0.0 & /usr/share/novnc/utils/novnc_proxy --vnc localhost:5900 --listen 6080 & python app.py"]
+CMD ["bash", "-lc", "set -euo pipefail; if [ -z \"${VNC_PASSWORD:-}\" ]; then echo \"VNC_PASSWORD is required\" >&2; exit 2; fi; Xvfb :99 -screen 0 1920x1080x24 -ac -nolisten tcp -dpi 96 & fluxbox -display :99 & x11vnc -storepasswd \"$VNC_PASSWORD\" /tmp/x11vnc.pass >/dev/null; x11vnc -display :99 -rfbport 5900 -rfbauth /tmp/x11vnc.pass -forever -shared -repeat -noxdamage -listen 0.0.0.0 & websockify --web /usr/share/novnc/ 6080 localhost:5900 & python app.py"]
