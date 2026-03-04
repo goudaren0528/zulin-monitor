@@ -2,6 +2,8 @@ __pycache__/
 *.pyc
 
 debug.log
+config.json
 config.local.json
 storage_state_order_scanner.json
 debug_last_page.png
+debug_405.png

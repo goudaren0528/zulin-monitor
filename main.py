@@ -198,6 +198,28 @@ def _pick_interval_seconds(fallback_seconds, min_seconds, max_seconds):
         return float(random.randint(int(mn), int(mx)))
     return float(random.uniform(mn, mx))
 
+def _env_truthy(name):
+    v = os.getenv(name)
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    return s not in ("", "0", "false", "no", "off", "disable", "disabled")
+
+def _is_production_env():
+    v = (
+        os.getenv("ORDER_POINT_ENV")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or os.getenv("PYTHON_ENV")
+    )
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    return s in ("prod", "production", "online", "release")
+
+def _linux_has_display():
+    return bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY") or os.getenv("MIR_SOCKET"))
+
 class OrderScanner:
     def __init__(self):
         self.config = {}
@@ -363,7 +385,26 @@ class OrderScanner:
         scan_interval = self.get_config("scan_interval", 30)
         scan_interval_min = self.get_config("scan_interval_min", None)
         scan_interval_max = self.get_config("scan_interval_max", None)
-        headless = self.get_config("headless", True)
+        headless_cfg = self.get_config("headless", True)
+        headless = bool(headless_cfg)
+        if _env_truthy("ORDER_POINT_HEADLESS") or _env_truthy("HEADLESS"):
+            headless = True
+        elif _env_truthy("ORDER_POINT_HEADED") or _env_truthy("HEADED"):
+            headless = False
+        elif _is_production_env() and sys.platform.startswith("linux"):
+            headless = False
+
+        if (not headless) and sys.platform.startswith("linux") and (not _linux_has_display()):
+            log("检测到 Linux 未配置 DISPLAY/WAYLAND_DISPLAY，自动切回 Headless 运行")
+            headless = True
+
+        slow_mo_val = self.get_config("slow_mo_ms", None)
+        if slow_mo_val is None:
+            slow_mo_val = os.getenv("SLOW_MO_MS")
+        try:
+            slow_mo_ms = int(float(slow_mo_val)) if slow_mo_val is not None else (80 if not headless else 0)
+        except Exception:
+            slow_mo_ms = 80 if not headless else 0
 
         log(f"启动浏览器... (Headless: {headless})")
         
@@ -382,13 +423,14 @@ class OrderScanner:
                         args.append(a)
 
                 channel = self.get_config("browser_channel", None)
+                launch_kwargs = {"headless": headless, "args": args, "slow_mo": slow_mo_ms}
+                if channel:
+                    launch_kwargs["channel"] = channel
                 try:
-                    if channel:
-                        browser = p.chromium.launch(headless=headless, args=args, channel=channel)
-                    else:
-                        browser = p.chromium.launch(headless=headless, args=args)
+                    browser = p.chromium.launch(**launch_kwargs)
                 except Exception:
-                    browser = p.chromium.launch(headless=headless, args=args)
+                    launch_kwargs.pop("channel", None)
+                    browser = p.chromium.launch(**launch_kwargs)
 
                 storage_state_path = self.get_config("storage_state_path", "")
                 if not storage_state_path:
@@ -445,6 +487,67 @@ class OrderScanner:
                     context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
                 page = context.new_page()
 
+                import random
+
+                action_delay_min_ms = self.get_config("action_delay_min_ms", 80)
+                action_delay_max_ms = self.get_config("action_delay_max_ms", 260)
+                typing_delay_min_ms = self.get_config("typing_delay_min_ms", 40)
+                typing_delay_max_ms = self.get_config("typing_delay_max_ms", 120)
+                manual_intervention_seconds = self.get_config("manual_intervention_seconds", 180)
+                try:
+                    manual_intervention_seconds = float(manual_intervention_seconds)
+                except Exception:
+                    manual_intervention_seconds = 180.0
+
+                def _human_pause(min_ms=None, max_ms=None):
+                    mn = action_delay_min_ms if min_ms is None else min_ms
+                    mx = action_delay_max_ms if max_ms is None else max_ms
+                    try:
+                        mn = int(float(mn))
+                    except Exception:
+                        mn = 80
+                    try:
+                        mx = int(float(mx))
+                    except Exception:
+                        mx = 260
+                    if mx < mn:
+                        mn, mx = mx, mn
+                    delay_ms = random.randint(max(0, mn), max(0, mx))
+                    self.stop_event.wait(delay_ms / 1000.0)
+
+                def _human_type(selector, text, timeout_ms=15000):
+                    loc = page.locator(selector).first
+                    loc.wait_for(state="visible", timeout=timeout_ms)
+                    try:
+                        loc.scroll_into_view_if_needed(timeout=timeout_ms)
+                    except Exception:
+                        pass
+                    try:
+                        loc.click(timeout=timeout_ms)
+                    except Exception:
+                        loc.click(timeout=timeout_ms, force=True)
+                    try:
+                        loc.fill("")
+                    except Exception:
+                        try:
+                            loc.press("Control+A")
+                            loc.press("Backspace")
+                        except Exception:
+                            pass
+                    try:
+                        mn = int(float(typing_delay_min_ms))
+                    except Exception:
+                        mn = 40
+                    try:
+                        mx = int(float(typing_delay_max_ms))
+                    except Exception:
+                        mx = 120
+                    if mx < mn:
+                        mn, mx = mx, mn
+                    delay = random.randint(max(0, mn), max(0, mx))
+                    loc.type("" if text is None else str(text), delay=delay)
+                    _human_pause()
+
                 from urllib.parse import urlparse
                 parsed = urlparse(url)
                 login_url = f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=user&a=login"
@@ -458,9 +561,15 @@ class OrderScanner:
                     try:
                         if page.locator(user_selector).count() > 0:
                             log("检测到登录页面，开始自动登录...")
-                            page.fill(user_selector, username)
-                            page.fill(pass_selector, password)
-                            page.press(pass_selector, "Enter")
+                            _human_type(user_selector, username)
+                            _human_type(pass_selector, password)
+                            try:
+                                page.press(pass_selector, "Enter")
+                            except Exception:
+                                try:
+                                    page.keyboard.press("Enter")
+                                except Exception:
+                                    pass
                             page.wait_for_load_state("networkidle")
                             log("登录操作完成")
                             try:
@@ -496,6 +605,11 @@ class OrderScanner:
                             loc = page.locator(sel).first
                             loc.wait_for(state="visible", timeout=timeout_ms)
                             try:
+                                loc.hover(timeout=timeout_ms)
+                            except Exception:
+                                pass
+                            _human_pause()
+                            try:
                                 loc.click()
                             except Exception:
                                 try:
@@ -503,6 +617,7 @@ class OrderScanner:
                                 except Exception:
                                     pass
                                 loc.click(force=True)
+                            _human_pause()
                             log(f"导航点击完成: {label} selector={sel} {_safe_page_state()}")
                             if wait_networkidle:
                                 try:
@@ -551,6 +666,14 @@ class OrderScanner:
                                 title_val = ""
                             is_405 = (status_code == 405) or ("405" in str(title_val))
                             if is_405:
+                                if not headless:
+                                    log(f"检测到访问被拦截/风控(405)，请在有头浏览器中手动处理后继续 (等待 {manual_intervention_seconds:.0f}s)")
+                                    try:
+                                        page.screenshot(path="debug_405.png", full_page=True)
+                                    except Exception:
+                                        pass
+                                    self.stop_event.wait(max(0.0, manual_intervention_seconds))
+                                    continue
                                 fallback_urls = [
                                     safe_entry_url,
                                     f"{parsed.scheme}://{parsed.netloc}/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web",
