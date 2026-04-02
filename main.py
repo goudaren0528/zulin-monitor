@@ -220,12 +220,52 @@ def _is_production_env():
 def _linux_has_display():
     return bool(os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY") or os.getenv("MIR_SOCKET"))
 
+def _normalize_keyword_mapping(keyword_mapping):
+    """
+    将 keyword_mapping 转换为统一的新格式（数组格式）。
+    兼容旧格式（字符串）和新格式（数组）。
+    """
+    normalized = {}
+    for keyword, value in keyword_mapping.items():
+        if isinstance(value, str):
+            # 旧格式：字符串，转换为单商家权重1
+            normalized[keyword] = [{"merchant": value, "weight": 1}]
+        elif isinstance(value, list):
+            # 新格式：数组，直接使用
+            normalized[keyword] = value
+        else:
+            # 未知格式，跳过
+            continue
+    return normalized
+
+
+def _build_weight_sequence(merchant_list):
+    """
+    根据权重构建轮询序列。
+    例如 [{"merchant": "A", "weight": 2}, {"merchant": "B", "weight": 1}]
+    返回 ["A", "A", "B"]
+    """
+    sequence = []
+    for item in merchant_list:
+        merchant = item.get("merchant", "")
+        weight = item.get("weight", 1)
+        try:
+            weight = int(weight)
+            if weight < 1:
+                weight = 1
+        except Exception:
+            weight = 1
+        for _ in range(weight):
+            sequence.append(merchant)
+    return sequence
+
 class OrderScanner:
     def __init__(self):
         self.config = {}
         self.running = False
         self.thread = None
         self.stop_event = threading.Event()
+        self._weight_router = {}  # 存储每个关键词的轮询索引
         self.load_config()
 
     def load_config(self):
@@ -257,6 +297,41 @@ class OrderScanner:
 
     def get_config(self, key, default=None):
         return self.config.get(key, default)
+
+    def _get_merchant_by_weight(self, keyword, merchant_list):
+        """
+        根据权重轮询获取商户。
+        返回 (商户名, 轮询信息字符串)
+        """
+        if not merchant_list:
+            return ("米奇租赁官方", "默认规则")
+
+        sequence = _build_weight_sequence(merchant_list)
+        if not sequence:
+            return ("米奇租赁官方", "默认规则")
+
+        # 获取或初始化轮询索引
+        if keyword not in self._weight_router:
+            self._weight_router[keyword] = 0
+
+        idx = self._weight_router[keyword]
+        selected_merchant = sequence[idx % len(sequence)]
+
+        # 更新索引
+        self._weight_router[keyword] = (idx + 1) % len(sequence)
+
+        # 构建轮询信息
+        current_pos = idx % len(sequence) + 1
+        total_pos = len(sequence)
+
+        # 计算权重比例字符串
+        weight_ratio = ":".join([str(item.get("weight", 1)) for item in merchant_list])
+
+        round_info = f"轮询: {current_pos}/{total_pos}"
+        if current_pos == 1:
+            round_info += f", 权重比 {weight_ratio}"
+
+        return (selected_merchant, round_info)
 
     def start(self):
         if self.running:
@@ -929,13 +1004,18 @@ class OrderScanner:
             
                             target_option = "米奇租赁官方"
                             matched_info = "默认规则"
-                            
-                            for keyword, option in keyword_mapping.items():
+                            matched_keyword = None
+
+                            # 规范化 keyword_mapping
+                            normalized_mapping = _normalize_keyword_mapping(keyword_mapping)
+
+                            for keyword, merchant_list in normalized_mapping.items():
                                 if keyword in text_content:
-                                    target_option = option
-                                    matched_info = f"关键词匹配: {keyword}"
+                                    matched_keyword = keyword
+                                    target_option, round_info = self._get_merchant_by_weight(keyword, merchant_list)
+                                    matched_info = f"关键词匹配: {keyword}, {round_info}"
                                     break
-                            
+
                             log(f"匹配结果: [{matched_info}] -> 分配给: [{target_option}]")
                             
                             # Assign
