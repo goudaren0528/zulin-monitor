@@ -162,13 +162,145 @@
 
             <!-- Config Tab -->
             <div class="tab-pane fade" id="config" role="tabpanel">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>配置文件 (config.json)</span>
-                        <button onclick="saveConfig()" class="btn btn-sm btn-primary">保存配置</button>
+                <!-- Common Config Section -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">📋 公共配置 (common)</div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label">用户名</label>
+                                <input type="text" id="config-username" class="form-control" placeholder="登录用户名">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">密码</label>
+                                <input type="password" id="config-password" class="form-control" placeholder="登录密码">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">无头模式</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="config-headless">
+                                    <label class="form-check-label" for="config-headless">启用</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="saveConfigSection('common')" class="btn btn-sm btn-primary">保存公共配置</button>
                     </div>
-                    <div class="card-body p-0">
-                        <textarea id="config-editor" class="form-control border-0" style="height: 600px; font-family: monospace; resize: none;"></textarea>
+                </div>
+
+                <!-- Order Scanner Config Section -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">📦 订单扫描配置 (order_scanner)</div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-md-12">
+                                <label class="form-label">扫描地址</label>
+                                <input type="text" id="config-url" class="form-control" placeholder="订单列表页面 URL">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-12">
+                                <label class="form-label">商户后台地址</label>
+                                <input type="text" id="config-merchant-url" class="form-control" placeholder="商户后台 URL">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label">扫描间隔 (秒)</label>
+                                <input type="number" id="config-scan-interval" class="form-control" value="60">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">最小间隔 (秒)</label>
+                                <input type="number" id="config-scan-interval-min" class="form-control" value="30">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">最大间隔 (秒)</label>
+                                <input type="number" id="config-scan-interval-max" class="form-control" value="120">
+                            </div>
+                        </div>
+                        <button onclick="saveConfigSection('order_scanner')" class="btn btn-sm btn-primary me-2">保存扫描配置</button>
+                    </div>
+                </div>
+
+                <!-- Keyword Mapping Section -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>🎯 关键词映射 (权重分配)</span>
+                        <button onclick="addKeywordRow()" class="btn btn-sm btn-success">+ 添加关键词</button>
+                    </div>
+                    <div class="card-body">
+                        <div id="keyword-mapping-table" class="table-responsive">
+                            <table class="table table-bordered align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 150px;">关键词</th>
+                                        <th>商户分配</th>
+                                        <th style="width: 80px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="keyword-mapping-body">
+                                    <!-- 动态生成 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mb-2">
+                            <small class="text-muted">提示：同一关键词可添加多个商户，权重决定分配比例。如权重 2:1 表示 A 分配 2 次，B 分配 1 次，循环轮询。</small>
+                        </div>
+                        <button onclick="saveKeywordMapping()" class="btn btn-sm btn-primary">保存关键词映射</button>
+                    </div>
+                </div>
+
+                <!-- Interface Monitor Config Section -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header">💰 接口监控配置 (interface_monitor)</div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-md-12">
+                                <label class="form-label">监控地址</label>
+                                <input type="text" id="config-monitor-url" class="form-control" placeholder="接口监控页面 URL">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-4">
+                                <label class="form-label">扫描间隔 (秒)</label>
+                                <input type="number" id="config-monitor-scan-interval" class="form-control" value="7200">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Webhook URL</label>
+                                <input type="text" id="config-monitor-webhook" class="form-control" placeholder="通知 Webhook">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">无头模式</label>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" id="config-monitor-headless">
+                                    <label class="form-check-label" for="config-monitor-headless">启用</label>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="saveConfigSection('interface_monitor')" class="btn btn-sm btn-primary">保存监控配置</button>
+                    </div>
+                </div>
+
+                <!-- Advanced Config Section -->
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>🔧 高级配置 (JSON)</span>
+                        <button onclick="saveAdvancedConfig()" class="btn btn-sm btn-primary">保存高级配置</button>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-2">
+                                <label class="form-label">Webhook 配置 (webhook_configs)</label>
+                                <textarea id="config-webhook-configs" class="form-control" style="height: 200px; font-family: monospace;" placeholder="[]"></textarea>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label class="form-label">RPA 群映射 (rpa_group_mapping)</label>
+                                <textarea id="config-rpa-group-mapping" class="form-control" style="height: 200px; font-family: monospace;" placeholder="{}"></textarea>
+                            </div>
+                            <div class="col-md-4 mb-2">
+                                <label class="form-label">监控项配置 (items)</label>
+                                <textarea id="config-monitor-items" class="form-control" style="height: 200px; font-family: monospace;" placeholder="[]"></textarea>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -178,7 +310,7 @@
     <script src="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/js/bootstrap.bundle.min.js"></script>
     <script>
         // Init
-        loadConfig();
+        loadAllConfigSections();
         setInterval(updateTime, 1000);
         setInterval(updateAllStatus, 2000);
         updateAllStatus();
@@ -214,7 +346,7 @@
         function updateStatusUI(prefix, data) {
             const dot = document.getElementById(prefix + '-status-dot');
             const text = document.getElementById(prefix + '-status-text');
-            
+
             if (data.running) {
                 dot.className = 'status-dot status-running';
                 text.textContent = '运行中';
@@ -228,7 +360,7 @@
             // Update logs
             const logContainer = document.getElementById(prefix + '-log-container');
             const isAutoScroll = document.getElementById(prefix + 'AutoScroll').checked;
-            
+
             // Only update if content changed to avoid flickering/performance issues (simple check)
             const newContent = data.logs.join('<br>');
             if (logContainer.innerHTML !== newContent) {
@@ -252,28 +384,310 @@
             });
         }
 
-        function loadConfig() {
-            fetch('/api/config')
+        // ========== Config Section Functions ==========
+
+        // Keyword Mapping State
+        let keywordMappingData = {};
+        let merchantList = [];
+
+        // Load all config sections
+        function loadAllConfigSections() {
+            fetch('/api/config/common')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('config-editor').value = JSON.stringify(data, null, 4);
+                    document.getElementById('config-username').value = data.username || '';
+                    document.getElementById('config-password').value = data.password || '';
+                    document.getElementById('config-headless').checked = data.headless !== false;
+                });
+
+            fetch('/api/config/order_scanner')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('config-url').value = data.url || '';
+                    document.getElementById('config-merchant-url').value = data.merchant_url || '';
+                    document.getElementById('config-scan-interval').value = data.scan_interval || 60;
+                    document.getElementById('config-scan-interval-min').value = data.scan_interval_min || 30;
+                    document.getElementById('config-scan-interval-max').value = data.scan_interval_max || 120;
+                });
+
+            fetch('/api/config/keyword_mapping')
+                .then(response => response.json())
+                .then(data => {
+                    keywordMappingData = data;
+                    renderKeywordMappingTable();
+                });
+
+            fetch('/api/config/interface_monitor')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('config-monitor-url').value = data.url || '';
+                    document.getElementById('config-monitor-scan-interval').value = data.scan_interval || 7200;
+                    document.getElementById('config-monitor-webhook').value = data.webhook_url || '';
+                    document.getElementById('config-monitor-headless').checked = data.headless !== false;
+                });
+
+            fetch('/api/config/advanced')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('config-webhook-configs').value = JSON.stringify(data.webhook_configs || [], null, 2);
+                    document.getElementById('config-rpa-group-mapping').value = JSON.stringify(data.rpa_group_mapping || {}, null, 2);
+                    document.getElementById('config-monitor-items').value = JSON.stringify(data.items || [], null, 2);
+                });
+
+            fetch('/api/merchants')
+                .then(response => response.json())
+                .then(data => {
+                    merchantList = data;
                 });
         }
 
-        function saveConfig() {
+        // Render keyword mapping table
+        function renderKeywordMappingTable() {
+            const tbody = document.getElementById('keyword-mapping-body');
+            tbody.innerHTML = '';
+
+            for (const [keyword, merchants] of Object.entries(keywordMappingData)) {
+                const row = createKeywordRow(keyword, merchants);
+                tbody.appendChild(row);
+            }
+        }
+
+        // Create a keyword row
+        function createKeywordRow(keyword, merchants) {
+            const tr = document.createElement('tr');
+            tr.dataset.keyword = keyword;
+
+            // Keyword cell
+            const tdKeyword = document.createElement('td');
+            const inputKeyword = document.createElement('input');
+            inputKeyword.type = 'text';
+            inputKeyword.className = 'form-control';
+            inputKeyword.value = keyword;
+            inputKeyword.placeholder = '关键词';
+            inputKeyword.onchange = function() {
+                updateKeywordRow(tr);
+            };
+            tdKeyword.appendChild(inputKeyword);
+            tr.appendChild(tdKeyword);
+
+            // Merchants cell
+            const tdMerchants = document.createElement('td');
+            const merchantsContainer = document.createElement('div');
+            merchantsContainer.className = 'merchants-container';
+
+            for (const merchant of merchants) {
+                const merchantDiv = createMerchantDiv(merchant.merchant, merchant.weight);
+                merchantsContainer.appendChild(merchantDiv);
+            }
+
+            // Add merchant button
+            const addBtn = document.createElement('button');
+            addBtn.className = 'btn btn-sm btn-outline-success ms-2';
+            addBtn.textContent = '+ 添加商户';
+            addBtn.onclick = function() {
+                const newDiv = createMerchantDiv('', 1);
+                merchantsContainer.insertBefore(newDiv, addBtn);
+            };
+            merchantsContainer.appendChild(addBtn);
+
+            tdMerchants.appendChild(merchantsContainer);
+            tr.appendChild(tdMerchants);
+
+            // Action cell
+            const tdAction = document.createElement('td');
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn btn-sm btn-danger';
+            deleteBtn.textContent = '删除';
+            deleteBtn.onclick = function() {
+                deleteKeywordRow(keyword);
+            };
+            tdAction.appendChild(deleteBtn);
+            tr.appendChild(tdAction);
+
+            return tr;
+        }
+
+        // Create merchant div with input and weight
+        function createMerchantDiv(merchantName, weight) {
+            const div = document.createElement('div');
+            div.className = 'd-flex align-items-center mb-1';
+
+            const selectMerchant = document.createElement('select');
+            selectMerchant.className = 'form-select form-select-sm me-2';
+            selectMerchant.style.width = '200px';
+
+            // Add options from merchant list
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = '选择商户...';
+            selectMerchant.appendChild(defaultOption);
+
+            for (const m of merchantList) {
+                const option = document.createElement('option');
+                option.value = m;
+                option.textContent = m;
+                if (m === merchantName) option.selected = true;
+                selectMerchant.appendChild(option);
+            }
+
+            // If merchant not in list, add it
+            if (merchantName && !merchantList.includes(merchantName)) {
+                const option = document.createElement('option');
+                option.value = merchantName;
+                option.textContent = merchantName;
+                option.selected = true;
+                selectMerchant.appendChild(option);
+            }
+
+            const weightInput = document.createElement('input');
+            weightInput.type = 'number';
+            weightInput.className = 'form-control form-control-sm me-2';
+            weightInput.style.width = '80px';
+            weightInput.value = weight;
+            weightInput.placeholder = '权重';
+            weightInput.min = 1;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'btn btn-sm btn-outline-danger';
+            removeBtn.textContent = '×';
+            removeBtn.onclick = function() {
+                div.remove();
+            };
+
+            div.appendChild(selectMerchant);
+            div.appendChild(weightInput);
+            div.appendChild(removeBtn);
+
+            return div;
+        }
+
+        // Add new keyword row
+        function addKeywordRow() {
+            const tbody = document.getElementById('keyword-mapping-body');
+            const newRow = createKeywordRow('', [{"merchant": "", "weight": 1}]);
+            tbody.appendChild(newRow);
+        }
+
+        // Update keyword row when keyword changes
+        function updateKeywordRow(tr) {
+            const inputKeyword = tr.querySelector('td:first-child input');
+            tr.dataset.keyword = inputKeyword.value;
+        }
+
+        // Delete keyword row
+        function deleteKeywordRow(keyword) {
+            delete keywordMappingData[keyword];
+            renderKeywordMappingTable();
+        }
+
+        // Save keyword mapping
+        function saveKeywordMapping() {
+            const tbody = document.getElementById('keyword-mapping-body');
+            const newMapping = {};
+
+            for (const row of tbody.rows) {
+                const keywordInput = row.querySelector('td:first-child input');
+                const keyword = keywordInput.value.trim();
+                if (!keyword) continue;
+
+                const merchantsContainer = row.querySelector('.merchants-container');
+                const merchantDivs = merchantsContainer.querySelectorAll('div.d-flex');
+
+                const merchants = [];
+                for (const div of merchantDivs) {
+                    const select = div.querySelector('select');
+                    const weightInput = div.querySelector('input[type="number"]');
+                    const merchant = select.value.trim();
+                    const weight = parseInt(weightInput.value) || 1;
+
+                    if (merchant && weight >= 1) {
+                        merchants.push({"merchant": merchant, "weight": weight});
+                    }
+                }
+
+                if (merchants.length > 0) {
+                    newMapping[keyword] = merchants;
+                }
+            }
+
+            fetch('/api/config/keyword_mapping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newMapping)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert('关键词映射已保存！');
+                    keywordMappingData = newMapping;
+                } else {
+                    alert('保存失败: ' + data.message);
+                }
+            });
+        }
+
+        // Save config section
+        function saveConfigSection(section) {
+            let data = {};
+
+            if (section === 'common') {
+                data = {
+                    username: document.getElementById('config-username').value,
+                    password: document.getElementById('config-password').value,
+                    headless: document.getElementById('config-headless').checked
+                };
+            } else if (section === 'order_scanner') {
+                data = {
+                    url: document.getElementById('config-url').value,
+                    merchant_url: document.getElementById('config-merchant-url').value,
+                    scan_interval: parseInt(document.getElementById('config-scan-interval').value) || 60,
+                    scan_interval_min: parseInt(document.getElementById('config-scan-interval-min').value) || 30,
+                    scan_interval_max: parseInt(document.getElementById('config-scan-interval-max').value) || 120
+                };
+            } else if (section === 'interface_monitor') {
+                data = {
+                    url: document.getElementById('config-monitor-url').value,
+                    scan_interval: parseInt(document.getElementById('config-monitor-scan-interval').value) || 7200,
+                    webhook_url: document.getElementById('config-monitor-webhook').value,
+                    headless: document.getElementById('config-monitor-headless').checked
+                };
+            }
+
+            fetch('/api/config/' + section, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    alert(section + ' 配置已保存！');
+                } else {
+                    alert('保存失败: ' + data.message);
+                }
+            });
+        }
+
+        // Save advanced config
+        function saveAdvancedConfig() {
             try {
-                const configStr = document.getElementById('config-editor').value;
-                const configData = JSON.parse(configStr);
-                
-                fetch('/api/config', {
+                const webhookConfigs = JSON.parse(document.getElementById('config-webhook-configs').value);
+                const rpaGroupMapping = JSON.parse(document.getElementById('config-rpa-group-mapping').value);
+                const items = JSON.parse(document.getElementById('config-monitor-items').value);
+
+                fetch('/api/config/advanced', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(configData)
+                    body: JSON.stringify({
+                        webhook_configs: webhookConfigs,
+                        rpa_group_mapping: rpaGroupMapping,
+                        items: items
+                    })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        alert('配置已保存！建议重启相关服务以生效。');
+                        alert('高级配置已保存！');
                     } else {
                         alert('保存失败: ' + data.message);
                     }
