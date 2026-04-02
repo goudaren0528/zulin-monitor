@@ -958,7 +958,7 @@ class OrderScanner:
 
                             merchant_top[merchant_name_clean] = merchant_top.get(merchant_name_clean, 0) + 1
                             
-                            if merchant_name_clean != "团团享官方":
+                            if merchant_name_clean != "米奇租赁":
                                 scan_stats["merchant_non_target"] += 1
                                 if scan_stats["merchant_non_target"] <= 6:
                                     row_text = _safe_inner_text(item_loc, "")
@@ -971,7 +971,7 @@ class OrderScanner:
 
                             scan_stats["merchant_target"] += 1
 
-                            log(f"-> 发现团团享官方订单 (索引: {i})...")
+                            log(f"-> 发现米奇租赁订单 (索引: {i})...")
                             item_selector = current_item_selector
                             text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
                             
