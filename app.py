@@ -256,15 +256,11 @@ def get_merchants():
     for merchant in rpa_mapping.keys():
         merchants.add(merchant)
 
-    # 添加默认商户
-    default_merchants = [
-        "米奇租赁官方",
-        "星享生活",
-        "团团享租奥丰店",
-        "深圳活力租赁"
-    ]
-    for m in default_merchants:
-        merchants.add(m)
+    # 从配置文件读取商家列表
+    config_merchants = order_config.get('merchants', [])
+    for m in config_merchants:
+        if m:
+            merchants.add(m)
 
     # 过滤空值
     merchants = [m for m in merchants if m]

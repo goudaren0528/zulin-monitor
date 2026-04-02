@@ -11,6 +11,13 @@
         "scan_interval_min": 30,
         "scan_interval_max": 120,
         "storage_state_path": "storage_state_order_scanner.json",
+        "target_platform": "米奇租赁",
+        "merchants": [
+            "米奇租赁官方",
+            "星享生活",
+            "团团享租奥丰店",
+            "深圳活力租赁"
+        ],
         "keyword_mapping": {
             "G7X2": "星享生活",
             "G7X3": "星享生活",
@@ -60,8 +67,6 @@
         "scan_interval": 7200,
         "webhook_url": "YOUR_WEBHOOK_URL_HERE",
         "headless": false,
-        "auto_update_threshold": true,
-        "threshold_step_ratio": 0.2,
         "items": [
             { "name": "E签宝静默签人脸", "threshold": 100 },
             { "name": "E签宝静默签合同", "threshold": 100 },

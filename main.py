@@ -457,6 +457,7 @@ class OrderScanner:
         username = self.get_config("username", "")
         password = self.get_config("password", "")
         keyword_mapping = self.get_config("keyword_mapping", {})
+        target_platform = self.get_config("target_platform", "米奇租赁")
         scan_interval = self.get_config("scan_interval", 30)
         scan_interval_min = self.get_config("scan_interval_min", None)
         scan_interval_max = self.get_config("scan_interval_max", None)
@@ -958,7 +959,7 @@ class OrderScanner:
 
                             merchant_top[merchant_name_clean] = merchant_top.get(merchant_name_clean, 0) + 1
                             
-                            if merchant_name_clean != "米奇租赁":
+                            if merchant_name_clean != target_platform:
                                 scan_stats["merchant_non_target"] += 1
                                 if scan_stats["merchant_non_target"] <= 6:
                                     row_text = _safe_inner_text(item_loc, "")
@@ -971,7 +972,7 @@ class OrderScanner:
 
                             scan_stats["merchant_target"] += 1
 
-                            log(f"-> 发现米奇租赁订单 (索引: {i})...")
+                            log(f"-> 发现 {target_platform} 订单 (索引: {i})...")
                             item_selector = current_item_selector
                             text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
                             

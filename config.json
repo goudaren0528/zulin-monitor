@@ -37,44 +37,242 @@
         "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
     },
     "order_scanner": {
-        "keyword_mapping": {
-            "G7X2": "星享生活",
-            "G7X3": "星享生活",
-            "Galaxy S23Ultra": "米奇租赁官方",
-            "RF100-400mm": "星享生活",
-            "SQ1": "米奇租赁官方",
-            "SX740": "米奇租赁官方",
-            "Ulike": "米奇租赁官方",
-            "X200": "米奇租赁官方",
-            "X300": "米奇租赁官方",
-            "action4": "米奇租赁官方",
-            "action5": "米奇租赁官方",
-            "mini11": "米奇租赁官方",
-            "mini12": "米奇租赁官方",
-            "mini40": "星享生活",
-            "mini90": "星享生活",
-            "mini99": "星享生活",
-            "wide": "米奇租赁官方",
-            "佳能 R50": "星享生活",
-            "佳能 RF50m": "星享生活",
-            "佳能RF-S 18-150": "星享生活",
-            "佳能RF-S 55-210": "星享生活",
-            "佳能ixus130": "米奇租赁官方",
-            "尼康": "星享生活",
-            "松下": "星享生活"
-        },
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
         "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
-        "rpa_group_mapping": {
-            "星享生活": "星享生活米奇支付宝入驻"
-        },
         "scan_interval": 120,
-        "scan_interval_min": 120,
-        "scan_interval_max": 300,
-        "skip_merchants": [
-            "活力租赁",
+        "scan_interval_min": 100,
+        "scan_interval_max": 220,
+        "target_platform": "米奇租赁",
+        "merchants": [
+            "米奇租赁官方",
+            "星享生活",
+            "团团享租奥丰店",
             "深圳活力租赁"
         ],
-        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "keyword_mapping": {
+            "CP1500": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "G7X2": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "G7X3": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "Galaxy S23Ultra": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "RF100-400mm": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "SQ1": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "SX740": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "Ulike": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "X200": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "X300": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "action4": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "action5": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "mini11": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "mini12": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "mini40": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "mini90": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "mini99": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "wide": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "佳能 R50": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能 RF50m": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能RF-S 18-150": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能RF-S 55-210": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能ixus130": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                }
+            ],
+            "尼康": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "松下": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "影石X5": [
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "松下ZS99": [
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能SX70": [
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "pocket3": [
+                {
+                    "merchant": "米奇租赁官方",
+                    "weight": 1
+                },
+                {
+                    "merchant": "团团享租奥丰店",
+                    "weight": 1
+                }
+            ],
+            "佳能 G11": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ],
+            "佳能 G9": [
+                {
+                    "merchant": "星享生活",
+                    "weight": 1
+                }
+            ]
+        },
         "webhook_configs": [
             {
                 "targets": [
@@ -88,7 +286,10 @@
                 ],
                 "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833"
             }
-        ]
+        ],
+        "rpa_group_mapping": {
+            "星享生活": "星享生活米奇支付宝入驻"
+        }
     },
     "order_sync": {
         "fetch_orders_api": "http://127.0.0.1:3000/api/order-sync/fetch",

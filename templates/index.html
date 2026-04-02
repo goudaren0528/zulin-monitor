@@ -217,6 +217,18 @@
                                 <input type="number" id="config-scan-interval-max" class="form-control" value="120">
                             </div>
                         </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="form-label">目标平台名称 (用于过滤订单)</label>
+                                <input type="text" id="config-target-platform" class="form-control" placeholder="如: 米奇租赁">
+                                <small class="text-muted">只处理该平台的订单，其他平台订单会被跳过</small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">商家列表 (逗号分隔)</label>
+                                <textarea id="config-merchants" class="form-control" rows="2" placeholder="米奇租赁官方,星享生活,团团享租奥丰店"></textarea>
+                                <small class="text-muted">用于关键词映射中的商户下拉选择</small>
+                            </div>
+                        </div>
                         <button onclick="saveConfigSection('order_scanner')" class="btn btn-sm btn-primary me-2">保存扫描配置</button>
                     </div>
                 </div>
@@ -408,6 +420,10 @@
                     document.getElementById('config-scan-interval').value = data.scan_interval || 60;
                     document.getElementById('config-scan-interval-min').value = data.scan_interval_min || 30;
                     document.getElementById('config-scan-interval-max').value = data.scan_interval_max || 120;
+                    document.getElementById('config-target-platform').value = data.target_platform || '米奇租赁';
+                    // 商家列表是数组，转为逗号分隔字符串
+                    const merchants = data.merchants || [];
+                    document.getElementById('config-merchants').value = merchants.join(', ');
                 });
 
             fetch('/api/config/keyword_mapping')
@@ -637,12 +653,17 @@
                     headless: document.getElementById('config-headless').checked
                 };
             } else if (section === 'order_scanner') {
+                // 商家列表从逗号分隔字符串转为数组
+                const merchantsStr = document.getElementById('config-merchants').value;
+                const merchants = merchantsStr.split(',').map(m => m.trim()).filter(m => m);
                 data = {
                     url: document.getElementById('config-url').value,
                     merchant_url: document.getElementById('config-merchant-url').value,
                     scan_interval: parseInt(document.getElementById('config-scan-interval').value) || 60,
                     scan_interval_min: parseInt(document.getElementById('config-scan-interval-min').value) || 30,
-                    scan_interval_max: parseInt(document.getElementById('config-scan-interval-max').value) || 120
+                    scan_interval_max: parseInt(document.getElementById('config-scan-interval-max').value) || 120,
+                    target_platform: document.getElementById('config-target-platform').value || '米奇租赁',
+                    merchants: merchants
                 };
             } else if (section === 'interface_monitor') {
                 data = {
