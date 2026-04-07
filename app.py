@@ -5,7 +5,7 @@ import threading
 import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 config_lock = threading.Lock()
@@ -347,6 +347,75 @@ def get_assignment_records():
         conn.close()
 
     return jsonify({'records': records})
+
+# --- Merchant Limits API ---
+@app.route('/api/merchants/limits', methods=['GET', 'POST'])
+def handle_merchant_limits():
+    """获取或设置商户限额"""
+    if request.method == 'GET':
+        limits = get_all_merchant_limits()
+        # 合并商户列表中尚未设置限额的商户
+        config = _load_full_config()
+        order_config = config.get('order_scanner', {})
+        all_merchants = set(order_config.get('merchants', []))
+
+        # 从 keyword_mapping 提取商户
+        keyword_mapping = order_config.get('keyword_mapping', {})
+        for keyword, value in keyword_mapping.items():
+            if isinstance(value, str):
+                all_merchants.add(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        all_merchants.add(item.get('merchant', ''))
+            elif isinstance(value, dict):
+                merchants = value.get('merchants', [])
+                for item in merchants:
+                    if isinstance(item, dict):
+                        all_merchants.add(item.get('merchant', ''))
+
+        # 补充未设置限额的商户
+        existing_merchants = {m['merchant'] for m in limits}
+        for m in all_merchants:
+            if m and m not in existing_merchants:
+                limits.append({
+                    'merchant': m,
+                    'limit_value': 0,
+                    'current_count': 0,
+                    'last_reset_at': '',
+                    'is_at_limit': False
+                })
+
+        return jsonify({'merchants': limits})
+
+    elif request.method == 'POST':
+        data = request.json
+        merchant = data.get('merchant')
+        limit_value = data.get('limit_value', 0)
+        if not merchant:
+            return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
+        set_merchant_limit(merchant=merchant, limit_value=limit_value)
+        return jsonify({'status': 'success', 'message': f'已设置 {merchant} 限额为 {limit_value}'})
+
+@app.route('/api/merchants/reset', methods=['POST'])
+def reset_merchant():
+    """重置单个商户进度"""
+    data = request.json
+    merchant = data.get('merchant')
+    if not merchant:
+        return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
+    reset_merchant_limit(merchant=merchant)
+    return jsonify({'status': 'success', 'message': f'已重置 {merchant} 进度'})
+
+@app.route('/api/merchants/reset-all', methods=['POST'])
+def reset_all_merchants():
+    """重置所有商户进度"""
+    limits = get_all_merchant_limits()
+    count = 0
+    for m in limits:
+        reset_merchant_limit(merchant=m['merchant'])
+        count += 1
+    return jsonify({'status': 'success', 'message': f'已重置 {count} 个商户进度', 'reset_count': count})
 
 if __name__ == '__main__':
     # Listen on all interfaces for Docker

@@ -823,6 +823,76 @@
             color: #22C55E;
             margin-left: 8px;
         }
+        /* Merchant Limit Cards */
+        .merchant-limits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .merchant-limit-card {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 16px;
+        }
+        .merchant-limit-card.at-limit {
+            border-color: var(--color-error);
+        }
+        .merchant-limit-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .merchant-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .merchant-status {
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: var(--color-muted);
+        }
+        .merchant-status.at-limit {
+            background: rgba(239, 68, 68, 0.1);
+            color: #EF4444;
+        }
+        .merchant-limit-progress {
+            margin-bottom: 12px;
+        }
+        .progress-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .progress-bar-container {
+            height: 8px;
+            background: var(--color-muted);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: var(--color-primary);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .progress-bar-fill.at-limit {
+            background: #EF4444;
+        }
+        .merchant-limit-controls {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .limit-input {
+            width: 80px;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--color-border);
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -1147,6 +1217,40 @@
                                 <!-- No Results State -->
                                 <div id="keyword-no-results" class="text-center py-4" style="display: none;">
                                     <p class="text-muted mb-0">未找到匹配的关键词</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Merchant Management Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMerchantLimits">
+                                <span class="section-title">
+                                    <!-- Users Icon -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                    </svg>
+                                    商户管理
+                                </span>
+                                <span class="accordion-badge" id="merchant-limits-badge">限额设置</span>
+                            </button>
+                        </h2>
+                        <div id="collapseMerchantLimits" class="accordion-collapse collapse">
+                            <div class="accordion-body">
+                                <div id="merchant-limits-container" class="merchant-limits-grid">
+                                    <div class="text-center py-4 text-muted">加载中...</div>
+                                </div>
+                                <div class="d-flex gap-2 mt-3">
+                                    <button onclick="loadMerchantLimits()" class="btn btn-outline-secondary btn-sm">
+                                        刷新状态
+                                    </button>
+                                    <button onclick="resetAllMerchantLimits()" class="btn btn-outline-warning btn-sm">
+                                        全部重置
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -2125,6 +2229,117 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadAllConfigSections();
         });
+
+        // Merchant Limits Management
+        function loadMerchantLimits() {
+            fetch('/api/merchants/limits')
+                .then(response => response.json())
+                .then(data => {
+                    renderMerchantLimits(data.merchants);
+                })
+                .catch(e => {
+                    document.getElementById('merchant-limits-container').innerHTML =
+                        '<div class="text-center py-4 text-danger">加载失败</div>';
+                });
+        }
+
+        function renderMerchantLimits(merchants) {
+            const container = document.getElementById('merchant-limits-container');
+
+            if (!merchants || merchants.length === 0) {
+                container.innerHTML = '<div class="text-center py-4 text-muted">暂无商户数据</div>';
+                return;
+            }
+
+            container.innerHTML = merchants.map(m => {
+                const limitValue = m.limit_value || 0;
+                const currentCount = m.current_count || 0;
+                const isAtLimit = limitValue > 0 && currentCount >= limitValue;
+                const progressPct = limitValue > 0 ? Math.min(100, (currentCount / limitValue) * 100) : 0;
+
+                return `
+                    <div class="merchant-limit-card ${isAtLimit ? 'at-limit' : ''}">
+                        <div class="merchant-limit-header">
+                            <span class="merchant-name">${m.merchant}</span>
+                            <span class="merchant-status ${isAtLimit ? 'at-limit' : ''}">
+                                ${isAtLimit ? '已满' : (limitValue > 0 ? '正常' : '无限制')}
+                            </span>
+                        </div>
+                        <div class="merchant-limit-progress">
+                            <div class="progress-text">
+                                ${limitValue > 0 ? `${currentCount}/${limitValue}` : '无限制'}
+                            </div>
+                            ${limitValue > 0 ? `
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill ${isAtLimit ? 'at-limit' : ''}"
+                                         style="width: ${progressPct}%"></div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="merchant-limit-controls">
+                            <input type="number" class="limit-input" value="${limitValue}" min="0"
+                                   data-merchant="${m.merchant}" placeholder="限额">
+                            <button class="btn btn-sm btn-outline-primary" onclick="saveMerchantLimit('${m.merchant}')">保存</button>
+                            <button class="btn btn-sm btn-outline-warning" onclick="resetMerchantLimit('${m.merchant}')">重置</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function saveMerchantLimit(merchant) {
+            const input = document.querySelector(`input[data-merchant="${merchant}"]`);
+            const limitValue = parseInt(input.value) || 0;
+
+            fetch('/api/merchants/limits', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({merchant: merchant, limit_value: limitValue})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已保存 ${merchant} 限额`, 'success');
+                    loadMerchantLimits();
+                } else {
+                    showToast(data.message || '保存失败', 'error');
+                }
+            });
+        }
+
+        function resetMerchantLimit(merchant) {
+            if (!confirm(`确认重置 ${merchant} 的计数进度？`)) return;
+
+            fetch('/api/merchants/reset', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({merchant: merchant})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已重置 ${merchant} 进度`, 'success');
+                    loadMerchantLimits();
+                }
+            });
+        }
+
+        function resetAllMerchantLimits() {
+            if (!confirm('确认重置所有商户的计数进度？')) return;
+
+            fetch('/api/merchants/reset-all', {method: 'POST'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已重置 ${data.reset_count} 个商户进度`, 'success');
+                    loadMerchantLimits();
+                }
+            });
+        }
+
+        // Initialize merchant limits on accordion show
+        document.querySelector('[data-bs-target="#collapseMerchantLimits"]')
+            .addEventListener('shown.bs.collapse', loadMerchantLimits);
     </script>
 </body>
 </html>

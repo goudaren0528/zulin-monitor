@@ -5,7 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
-from db import record_assignment, init_db
+from db import record_assignment, init_db, get_merchants_at_limit
 
 # Try importing Windows-specific libraries safely
 try:
@@ -339,13 +339,32 @@ class OrderScanner:
 
     def _get_merchant_by_weight(self, keyword, merchant_list):
         """
-        根据权重轮询获取商户。
+        根据权重轮询获取商户，排除已达到限额的商户。
         返回 (商户名, 轮询信息字符串)
         """
         if not merchant_list:
             return ("米奇租赁官方", "默认规则")
 
-        sequence = _build_weight_sequence(merchant_list)
+        # 获取已达到限额的商户
+        excluded_merchants = set(get_merchants_at_limit())
+
+        # 过滤掉已达到限额的商户
+        available_merchants = [
+            m for m in merchant_list
+            if m.get("merchant") not in excluded_merchants
+        ]
+
+        if not available_merchants:
+            log(f"所有商户均已达到限额，使用默认商户")
+            return ("米奇租赁官方", "所有商户限额已满")
+
+        # 记录被排除的商户
+        original_names = {m.get("merchant") for m in merchant_list}
+        excluded_names = original_names & excluded_merchants
+        if excluded_names:
+            log(f"排除限额商户: {list(excluded_names)}")
+
+        sequence = _build_weight_sequence(available_merchants)
         if not sequence:
             return ("米奇租赁官方", "默认规则")
 
@@ -364,7 +383,7 @@ class OrderScanner:
         total_pos = len(sequence)
 
         # 计算权重比例字符串
-        weight_ratio = ":".join([str(item.get("weight", 1)) for item in merchant_list])
+        weight_ratio = ":".join([str(item.get("weight", 1)) for item in available_merchants])
 
         round_info = f"轮询: {current_pos}/{total_pos}"
         if current_pos == 1:
