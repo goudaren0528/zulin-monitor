@@ -222,17 +222,31 @@ def _linux_has_display():
 
 def _normalize_keyword_mapping(keyword_mapping):
     """
-    将 keyword_mapping 转换为统一的新格式（数组格式）。
-    兼容旧格式（字符串）和新格式（数组）。
+    将 keyword_mapping 转换为统一的新格式。
+    支持三种格式：
+    1. 旧字符串格式: {"keyword": "merchant"}
+    2. 旧数组格式: {"keyword": [{"merchant": "X", "weight": 1}]}
+    3. 新对象格式: {"keyword": {"product": "商品", "merchants": [{"merchant": "X", "weight": 1}]}}
+
+    Returns:
+        dict: {keyword: {"product": str, "merchants": list}}
     """
     normalized = {}
     for keyword, value in keyword_mapping.items():
         if isinstance(value, str):
             # 旧格式：字符串，转换为单商家权重1
-            normalized[keyword] = [{"merchant": value, "weight": 1}]
+            normalized[keyword] = {"product": "", "merchants": [{"merchant": value, "weight": 1}]}
         elif isinstance(value, list):
-            # 新格式：数组，直接使用
-            normalized[keyword] = value
+            # 旧格式：数组，直接使用
+            normalized[keyword] = {"product": "", "merchants": value}
+        elif isinstance(value, dict):
+            # 新格式：对象，提取 product 和 merchants
+            product = value.get("product", "")
+            merchants = value.get("merchants", [])
+            if not merchants:
+                # 兼容：如果没有 merchants 字段但有商家数据
+                merchants = [{"merchant": m, "weight": 1} for m in value.get("merchants", [])]
+            normalized[keyword] = {"product": product, "merchants": merchants}
         else:
             # 未知格式，跳过
             continue
@@ -1035,10 +1049,11 @@ class OrderScanner:
                             # 将文本内容转为小写用于匹配
                             text_content_lower = text_content.lower()
 
-                            for keyword_entry, merchant_list in normalized_mapping.items():
+                            for keyword_entry, mapping_obj in normalized_mapping.items():
                                 matched, matched_kw = _match_keyword(keyword_entry, text_content_lower)
                                 if matched:
                                     matched_keyword = keyword_entry
+                                    merchant_list = mapping_obj.get("merchants", [])
                                     target_option, round_info = self._get_merchant_by_weight(keyword_entry, merchant_list)
                                     matched_info = f"关键词匹配: {matched_kw} (规则: {keyword_entry}), {round_info}"
                                     break
