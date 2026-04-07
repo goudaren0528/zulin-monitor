@@ -794,6 +794,35 @@
         .keyword-card-header {
             justify-content: flex-end;
         }
+
+        /* Statistics Tab Styles */
+        .stats-container {
+            padding: 20px;
+        }
+        .stats-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .stats-total-label {
+            color: #64748B;
+            font-size: 14px;
+        }
+        .stats-total-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-primary);
+        }
+        .keyword-product {
+            display: inline-block;
+            padding: 2px 8px;
+            background-color: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 4px;
+            font-size: 12px;
+            color: #22C55E;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -846,6 +875,17 @@
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
                     </svg>
                     全局配置
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab" aria-selected="false">
+                    <!-- Bar Chart Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" x2="12" y1="20" y2="10"/>
+                        <line x1="18" x2="18" y1="20" y2="4"/>
+                        <line x1="6" x2="6" y1="20" y2="16"/>
+                    </svg>
+                    统计
                 </button>
             </li>
         </ul>
@@ -1236,6 +1276,74 @@
                 </div>
             </div>
         </div>
+
+        <!-- Statistics Tab -->
+        <div class="tab-pane fade" id="stats" role="tabpanel" aria-labelledby="stats-tab">
+            <div class="stats-container">
+                <!-- 日期选择器 -->
+                <div class="stats-header mb-4">
+                    <div class="d-flex align-items-center gap-3">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changeStatsDate(-1)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                        </button>
+                        <input type="date" class="form-control" id="stats-date" style="width: 150px;">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="changeStatsDate(1)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadStats()">刷新</button>
+                    </div>
+                    <div class="stats-summary mt-3">
+                        <span class="stats-total-label">当日总分单：</span>
+                        <span class="stats-total-value" id="stats-total">0</span>
+                    </div>
+                </div>
+
+                <!-- 商家统计表格 -->
+                <div class="card">
+                    <div class="card-body">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>商家名称</th>
+                                    <th class="text-center">当日分单</th>
+                                    <th class="text-center">累计分单</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-table-body">
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 分单记录列表 -->
+                <div class="card mt-4">
+                    <div class="card-header">
+                        分单记录
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>关键词</th>
+                                    <th>商品</th>
+                                    <th>商家</th>
+                                    <th>订单号</th>
+                                </tr>
+                            </thead>
+                            <tbody id="stats-records-body">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">加载中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Toast Container -->
@@ -1255,6 +1363,11 @@
                         <label class="form-label" for="edit-keyword">关键词 <span class="text-danger">*</span></label>
                         <input type="text" id="edit-keyword" class="form-control" placeholder="如: G7X3, g7x3, G7X-3">
                         <small class="text-muted">多个关键词用逗号分隔，匹配时不区分大小写</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="edit-product">商品名称</label>
+                        <input type="text" id="edit-product" class="form-control" placeholder="如：大疆Pocket3">
+                        <small class="text-muted">可选，用于统计记录</small>
                     </div>
                     <div class="mb-2">
                         <label class="form-label">商户分配</label>
@@ -1466,8 +1579,8 @@
 
             emptyState.style.display = 'none';
 
-            keywords.forEach(([keyword, merchants]) => {
-                const card = createKeywordCard(keyword, merchants);
+            keywords.forEach(([keyword, item]) => {
+                const card = createKeywordCard(keyword, item);
                 container.appendChild(card);
             });
 
@@ -1475,7 +1588,11 @@
         }
 
         // Create a keyword card
-        function createKeywordCard(keyword, merchants) {
+        function createKeywordCard(keyword, item) {
+            // Handle new object format or legacy array format
+            const product = item.product || '';
+            const merchants = item.merchants || (Array.isArray(item) ? item : []);
+
             const card = document.createElement('div');
             card.className = 'keyword-card';
             card.dataset.keyword = keyword;
@@ -1516,6 +1633,14 @@
                 kwTag.className = 'keyword-keyword-tag';
                 kwTag.textContent = kw;
                 keywordsDiv.appendChild(kwTag);
+
+                // Add product tag after first keyword if present
+                if (idx === 0 && product) {
+                    const productTag = document.createElement('span');
+                    productTag.className = 'keyword-product';
+                    productTag.textContent = product;
+                    keywordsDiv.appendChild(productTag);
+                }
             });
 
             // Merchants tags container
@@ -1569,6 +1694,7 @@
             const modal = new bootstrap.Modal(document.getElementById('keywordModal'));
             const title = document.getElementById('keywordModalLabel');
             const keywordInput = document.getElementById('edit-keyword');
+            const productInput = document.getElementById('edit-product');
             const originalInput = document.getElementById('edit-keyword-original');
             const merchantsList = document.getElementById('edit-merchants-list');
 
@@ -1577,11 +1703,17 @@
                 title.textContent = '编辑关键词映射';
                 keywordInput.value = keyword;
                 originalInput.value = keyword;
-                renderEditMerchants(keywordMappingData[keyword]);
+                // Handle new object format or legacy array format
+                const item = keywordMappingData[keyword];
+                const product = item.product || '';
+                const merchants = item.merchants || (Array.isArray(item) ? item : []);
+                productInput.value = product;
+                renderEditMerchants(merchants);
             } else {
                 // Add mode
                 title.textContent = '新增关键词映射';
                 keywordInput.value = '';
+                productInput.value = '';
                 originalInput.value = '';
                 renderEditMerchants([{ merchant: '', weight: 1 }]);
             }
@@ -1633,6 +1765,7 @@
         // Save keyword from modal
         function saveKeywordFromModal() {
             const keywordRaw = document.getElementById('edit-keyword').value.trim();
+            const product = document.getElementById('edit-product').value.trim();
             const original = document.getElementById('edit-keyword-original').value;
             const rows = document.querySelectorAll('.edit-merchant-row');
 
@@ -1674,7 +1807,8 @@
                 delete keywordMappingData[original];
             }
 
-            keywordMappingData[keyword] = merchants;
+            // Save in new object format
+            keywordMappingData[keyword] = { product: product, merchants: merchants };
             renderKeywordMappingTable();
             markAsChanged();
 
@@ -1779,14 +1913,13 @@
                     }
                 }
 
-                // Save all sections
-                const results = await Promise.all([
-                    saveConfigSectionAsync('common'),
-                    saveConfigSectionAsync('order_scanner'),
-                    saveConfigSectionAsync('interface_monitor'),
-                    saveKeywordMappingAsync(),
-                    saveAdvancedConfigAsync()
-                ]);
+                // Save all sections sequentially to avoid concurrent file write conflicts
+                const results = [];
+                results.push(await saveConfigSectionAsync('common'));
+                results.push(await saveConfigSectionAsync('order_scanner'));
+                results.push(await saveConfigSectionAsync('interface_monitor'));
+                results.push(await saveKeywordMappingAsync());
+                results.push(await saveAdvancedConfigAsync());
 
                 const failed = results.filter(r => !r.success);
                 if (failed.length > 0) {
@@ -1841,8 +1974,14 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
-            .then(response => response.json())
-            .then(data => ({ section, success: data.status === 'success' }));
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => ({ section, success: data.status === 'success' }))
+            .catch(e => ({ section, success: false, error: e.message }));
         }
 
         function saveKeywordMappingAsync() {
@@ -1851,35 +1990,48 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(keywordMappingData)
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
                     updateKeywordBadge();
                 }
                 return { section: 'keyword_mapping', success: data.status === 'success' };
-            });
+            })
+            .catch(e => ({ section: 'keyword_mapping', success: false, error: e.message }));
         }
 
         function saveAdvancedConfigAsync() {
+            let webhookConfigs, rpaGroupMapping, items;
             try {
-                const webhookConfigs = JSON.parse(document.getElementById('config-webhook-configs').value || '[]');
-                const rpaGroupMapping = JSON.parse(document.getElementById('config-rpa-group-mapping').value || '{}');
-                const items = JSON.parse(document.getElementById('config-monitor-items').value || '[]');
-
-                return fetch('/api/config/advanced', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        webhook_configs: webhookConfigs,
-                        rpa_group_mapping: rpaGroupMapping,
-                        items: items
-                    })
-                })
-                .then(response => response.json())
-                .then(data => ({ section: 'advanced', success: data.status === 'success' }));
+                webhookConfigs = JSON.parse(document.getElementById('config-webhook-configs').value || '[]');
+                rpaGroupMapping = JSON.parse(document.getElementById('config-rpa-group-mapping').value || '{}');
+                items = JSON.parse(document.getElementById('config-monitor-items').value || '[]');
             } catch (e) {
-                return Promise.resolve({ section: 'advanced', success: false });
+                return Promise.resolve({ section: 'advanced', success: false, error: 'JSON解析错误' });
             }
+
+            return fetch('/api/config/advanced', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    webhook_configs: webhookConfigs,
+                    rpa_group_mapping: rpaGroupMapping,
+                    items: items
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => ({ section: 'advanced', success: data.status === 'success' }))
+            .catch(e => ({ section: 'advanced', success: false, error: e.message }));
         }
 
         // Reset all config
@@ -1897,6 +2049,76 @@
                 e.preventDefault();
                 e.returnValue = '';
             }
+        });
+
+        // Statistics Tab Functions
+        function initStatsDate() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('stats-date').value = today;
+        }
+
+        function changeStatsDate(delta) {
+            const dateInput = document.getElementById('stats-date');
+            const current = new Date(dateInput.value);
+            current.setDate(current.getDate() + delta);
+            dateInput.value = current.toISOString().split('T')[0];
+            loadStats();
+        }
+
+        function loadStats() {
+            const date = document.getElementById('stats-date').value;
+
+            // Load daily stats
+            fetch(`/api/stats/daily?date=${date}`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('stats-total').textContent = data.total;
+
+                    const tbody = document.getElementById('stats-table-body');
+                    if (data.merchants.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">无分单记录</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.merchants.map(m => `
+                            <tr>
+                                <td>${m.merchant}</td>
+                                <td class="text-center"><strong>${m.daily_count}</strong></td>
+                                <td class="text-center">${m.total_count}</td>
+                            </tr>
+                        `).join('');
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('stats-table-body').innerHTML = '<tr><td colspan="3" class="text-center text-danger">加载失败</td></tr>';
+                });
+
+            // Load records
+            fetch(`/api/stats/records?date=${date}&limit=50`)
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('stats-records-body');
+                    if (data.records.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">无分单记录</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.records.map(r => `
+                            <tr>
+                                <td>${r.created_at.split(' ')[1] || r.created_at}</td>
+                                <td>${r.matched_keyword || r.keyword_entry || '-'}</td>
+                                <td>${r.product || '-'}</td>
+                                <td>${r.merchant}</td>
+                                <td>${r.order_no || '-'}</td>
+                            </tr>
+                        `).join('');
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('stats-records-body').innerHTML = '<tr><td colspan="5" class="text-center text-danger">加载失败</td></tr>';
+                });
+        }
+
+        // Initialize stats tab on show
+        document.getElementById('stats-tab').addEventListener('shown.bs.tab', function() {
+            initStatsDate();
+            loadStats();
         });
 
         // Initialize
