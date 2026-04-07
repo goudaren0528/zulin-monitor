@@ -42,7 +42,7 @@
         "scan_interval": 120,
         "scan_interval_min": 100,
         "scan_interval_max": 220,
-        "target_platform": "米奇租赁",
+        "target_platform": "团团享",
         "merchants": [
             "米奇租赁官方",
             "星享生活",
@@ -290,12 +290,5 @@
         "rpa_group_mapping": {
             "星享生活": "星享生活米奇支付宝入驻"
         }
-    },
-    "order_sync": {
-        "fetch_orders_api": "http://127.0.0.1:3000/api/order-sync/fetch",
-        "headless": true,
-        "scan_interval": 60,
-        "update_order_api": "http://127.0.0.1:3000/api/order-sync/update",
-        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.main"
     }
 }

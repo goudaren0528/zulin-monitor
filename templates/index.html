@@ -5,315 +5,1248 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>综合管理控制台</title>
     <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
+        /* Design System Variables */
+        :root {
+            --color-primary: #2563EB;
+            --color-on-primary: #FFFFFF;
+            --color-secondary: #3B82F6;
+            --color-accent: #059669;
+            --color-background: #F8FAFC;
+            --color-foreground: #0F172A;
+            --color-muted: #F1F5FD;
+            --color-border: #E4ECFC;
+            --color-destructive: #DC2626;
+            --color-ring: #2563EB;
+            --color-surface: #FFFFFF;
+            --color-success: #10B981;
+            --color-warning: #F59E0B;
+            --color-error: #EF4444;
+
+            --transition-fast: 150ms;
+            --transition-normal: 250ms;
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        /* Base Styles */
+        body {
+            font-family: 'Fira Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--color-background);
+            color: var(--color-foreground);
+            line-height: 1.5;
+        }
+
+        /* Cards */
+        .card {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            transition: box-shadow var(--transition-normal) var(--ease-out);
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            background-color: var(--color-muted);
+            border-bottom: 1px solid var(--color-border);
+            font-weight: 600;
+            padding: 12px 16px;
+            font-size: 14px;
+            color: var(--color-foreground);
+        }
+
+        .card-body {
+            padding: 16px;
+        }
+
+        /* Header */
+        .app-header {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            color: var(--color-on-primary);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .app-title svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        /* Tabs Navigation */
+        .nav-tabs {
+            border-bottom: 2px solid var(--color-border);
+            gap: 4px;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            border-bottom: 2px solid transparent;
+            color: #64748B;
+            font-weight: 500;
+            padding: 12px 20px;
+            transition: all var(--transition-normal) var(--ease-out);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            cursor: pointer;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--color-primary);
+            background-color: var(--color-muted);
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--color-primary);
+            border-bottom-color: var(--color-primary);
+            background-color: transparent;
+        }
+
+        .nav-tabs .nav-link svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+        }
+
+        /* Status Indicator */
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background-color: var(--color-muted);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #94A3B8;
+            transition: background-color var(--transition-fast);
+        }
+
+        .status-running {
+            background-color: var(--color-success);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+
+        .status-stopped {
+            background-color: var(--color-error);
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Buttons */
+        .btn {
+            font-family: 'Fira Sans', sans-serif;
+            font-weight: 500;
+            padding: 10px 16px;
+            border-radius: 8px;
+            transition: all var(--transition-fast) var(--ease-out);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:focus {
+            outline: 2px solid var(--color-ring);
+            outline-offset: 2px;
+        }
+
+        .btn-success {
+            background-color: var(--color-accent);
+            border-color: var(--color-accent);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background-color: #047857;
+            border-color: #047857;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background-color: var(--color-destructive);
+            border-color: var(--color-destructive);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: #B91C1C;
+            border-color: #B91C1C;
+            transform: translateY(-1px);
+        }
+
+        .btn-warning {
+            background-color: var(--color-warning);
+            border-color: var(--color-warning);
+            color: white;
+        }
+
+        .btn-warning:hover {
+            background-color: #D97706;
+            border-color: #D97706;
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #1D4ED8;
+            border-color: #1D4ED8;
+            transform: translateY(-1px);
+        }
+
+        .btn-outline-success {
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+        }
+
+        .btn-outline-success:hover {
+            background-color: var(--color-accent);
+            color: white;
+        }
+
+        .btn-outline-danger {
+            border-color: var(--color-destructive);
+            color: var(--color-destructive);
+        }
+
+        .btn-outline-danger:hover {
+            background-color: var(--color-destructive);
+            color: white;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        /* Button Group */
+        .btn-group {
+            gap: 8px;
+            display: flex;
+        }
+
+        .btn-group .btn {
+            border-radius: 8px;
+        }
+
+        /* Log Container */
         .log-container {
             height: 400px;
-            overflow-y: scroll;
-            background-color: #1e1e1e;
-            color: #00ff00;
-            font-family: monospace;
-            padding: 10px;
-            border-radius: 5px;
+            overflow-y: auto;
+            background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+            color: #22C55E;
+            font-family: 'Fira Sans', monospace;
+            font-size: 13px;
+            padding: 16px;
+            border-radius: 8px;
+            line-height: 1.6;
         }
-        .status-dot {
-            height: 15px;
-            width: 15px;
-            background-color: #bbb;
+
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: #1E293B;
+            border-radius: 4px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+
+        .log-container::-webkit-scrollbar-thumb:hover {
+            background: #64748B;
+        }
+
+        /* Form Elements */
+        .form-control, .form-select {
+            font-family: 'Fira Sans', sans-serif;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 14px;
+            transition: all var(--transition-fast);
+            background-color: var(--color-surface);
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--color-primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+            outline: none;
+        }
+
+        .form-control:hover, .form-select:hover {
+            border-color: var(--color-secondary);
+        }
+
+        .form-label {
+            font-weight: 500;
+            color: var(--color-foreground);
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        .form-check-input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .form-check-input:checked {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+
+        .form-check-input:focus {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+        }
+
+        /* Tables */
+        .table {
+            border-color: var(--color-border);
+        }
+
+        .table thead th {
+            background-color: var(--color-muted);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--color-foreground);
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .table tbody tr:hover {
+            background-color: var(--color-muted);
+        }
+
+        /* Section Titles */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--color-foreground);
+        }
+
+        .section-title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--color-primary);
+        }
+
+        /* Control Panel */
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .control-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Alerts/Toast */
+        .toast-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background-color: var(--color-surface);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1000;
+            animation: slideIn 0.3s var(--ease-out);
+        }
+
+        .toast-success {
+            border-left: 4px solid var(--color-success);
+        }
+
+        .toast-error {
+            border-left: 4px solid var(--color-error);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Reduced Motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .control-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            .app-header {
+                flex-direction: column;
+                gap: 12px;
+                text-align: center;
+            }
+
+            .nav-tabs .nav-link {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+        }
+
+        /* Small Text */
+        .text-muted {
+            color: #64748B !important;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+
+        /* Keyboard Focus Visible */
+        :focus-visible {
+            outline: 2px solid var(--color-ring);
+            outline-offset: 2px;
+        }
+
+        /* Accordion Styles */
+        .accordion-item {
+            border: 1px solid var(--color-border);
+            border-radius: 8px !important;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+
+        .accordion-button {
+            font-weight: 500;
+            padding: 14px 16px;
+            background-color: var(--color-surface);
+            transition: all var(--transition-fast);
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: var(--color-muted);
+            color: var(--color-primary);
+        }
+
+        .accordion-button:hover {
+            background-color: var(--color-muted);
+        }
+
+        .accordion-button:focus {
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+        }
+
+        .accordion-body {
+            padding: 16px;
+            background-color: var(--color-surface);
+        }
+
+        .accordion-badge {
+            margin-left: auto;
+            padding: 4px 10px;
+            background-color: var(--color-muted);
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            color: #64748B;
+            margin-right: 8px;
+        }
+
+        .accordion-badge-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            color: var(--color-warning);
+        }
+
+        /* Unsaved Changes Indicator */
+        .unsaved-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 8px;
+            margin-bottom: 16px;
+            color: var(--color-warning);
+            font-weight: 500;
+            font-size: 14px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Floating Save Bar */
+        .floating-save-bar {
+            position: sticky;
+            bottom: 0;
+            background-color: var(--color-surface);
+            border-top: 1px solid var(--color-border);
+            padding: 12px 20px;
+            border-radius: 8px;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+            margin-top: 16px;
+            z-index: 100;
+        }
+
+        .save-status-dot {
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
-            display: inline-block;
-            margin-right: 5px;
+            background-color: var(--color-success);
+            transition: background-color var(--transition-fast);
         }
-        .status-running { background-color: #28a745; }
-        .status-stopped { background-color: #dc3545; }
+
+        .save-status-dot.unsaved {
+            background-color: var(--color-warning);
+        }
+
+        .save-status-text {
+            font-size: 13px;
+            color: #64748B;
+        }
+
+        /* Quick Add Form */
+        .quick-add-form {
+            background-color: var(--color-muted);
+            padding: 12px;
+            border-radius: 8px;
+        }
+
+        /* Keyword Stats */
+        .keyword-stats {
+            padding: 8px 12px;
+            background-color: var(--color-muted);
+            border-radius: 6px;
+        }
+
+        /* JSON Textarea */
+        .font-monospace {
+            font-family: 'Fira Code', 'Consolas', monospace !important;
+        }
+
+        /* Input Group */
+        .input-group .btn-outline-secondary {
+            border-color: var(--color-border);
+        }
+
+        .input-group .btn-outline-secondary:hover {
+            background-color: var(--color-muted);
+            border-color: var(--color-secondary);
+        }
+
+        /* Validation States */
+        .form-control.is-invalid {
+            border-color: var(--color-error);
+            background-image: none;
+        }
+
+        .form-control.is-valid {
+            border-color: var(--color-success);
+            background-image: none;
+        }
+
+        /* Alert Custom */
+        .alert-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            color: var(--color-foreground);
+        }
+
+        /* Row Gap */
+        .g-3 {
+            --bs-gutter-y: 1rem;
+        }
+
+        /* Keyword Cards Grid */
+        .keyword-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 12px;
+            max-height: 500px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .keyword-card {
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 10px;
+            padding: 12px;
+            transition: all var(--transition-fast);
+            cursor: pointer;
+        }
+
+        .keyword-card:hover {
+            border-color: var(--color-primary);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+        }
+
+        .keyword-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .keyword-card-title {
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--color-foreground);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .keyword-card-title svg {
+            color: var(--color-primary);
+        }
+
+        .keyword-card-delete {
+            opacity: 0;
+            transition: opacity var(--transition-fast);
+            padding: 4px;
+            border-radius: 4px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: var(--color-destructive);
+        }
+
+        .keyword-card:hover .keyword-card-delete {
+            opacity: 1;
+        }
+
+        .keyword-card-delete:hover {
+            background-color: rgba(220, 38, 38, 0.1);
+        }
+
+        .keyword-card-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .merchant-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background-color: var(--color-muted);
+            border-radius: 16px;
+            font-size: 12px;
+            color: var(--color-foreground);
+            max-width: 100%;
+        }
+
+        .merchant-tag-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+        }
+
+        .merchant-tag-weight {
+            background-color: var(--color-primary);
+            color: white;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            min-width: 16px;
+            text-align: center;
+        }
+
+        /* Merchant colors for tags */
+        .merchant-tag:nth-child(6n+1) { background-color: rgba(37, 99, 235, 0.1); }
+        .merchant-tag:nth-child(6n+2) { background-color: rgba(16, 185, 129, 0.1); }
+        .merchant-tag:nth-child(6n+3) { background-color: rgba(245, 158, 11, 0.1); }
+        .merchant-tag:nth-child(6n+4) { background-color: rgba(139, 92, 246, 0.1); }
+        .merchant-tag:nth-child(6n+5) { background-color: rgba(236, 72, 153, 0.1); }
+        .merchant-tag:nth-child(6n+6) { background-color: rgba(6, 182, 212, 0.1); }
+
+        /* Edit Merchants List */
+        .edit-merchants-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .edit-merchant-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            padding: 8px;
+            background-color: var(--color-muted);
+            border-radius: 8px;
+        }
+
+        .edit-merchant-row select {
+            flex: 1;
+        }
+
+        .edit-merchant-row input[type="number"] {
+            width: 80px;
+        }
+
+        /* Scrollbar for cards grid */
+        .keyword-cards-grid::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .keyword-cards-grid::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .keyword-cards-grid::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 3px;
+        }
+
+        .keyword-cards-grid::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
+        /* Input Group Sm */
+        .input-group-sm .form-control {
+            font-size: 13px;
+        }
+
+        .input-group-text {
+            border-color: var(--color-border);
+        }
     </style>
 </head>
-<body class="bg-light">
+<body>
     <div class="container py-4">
-        <header class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
-            <span class="fs-4">🛠️ 综合管理控制台</span>
+        <!-- Header -->
+        <header class="app-header">
+            <div class="app-title">
+                <!-- Settings Icon (SVG) -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+                综合管理控制台
+            </div>
             <div>
-                <span class="text-muted small">系统时间: <span id="sys-time">--:--:--</span></span>
+                <span class="small opacity-75">系统时间: <span id="sys-time">--:--:--</span></span>
             </div>
         </header>
 
+        <!-- Tabs Navigation -->
         <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="order-tab" data-bs-toggle="tab" data-bs-target="#order" type="button" role="tab">📦 订单自动化</button>
+                <button class="nav-link active" id="order-tab" data-bs-toggle="tab" data-bs-target="#order" type="button" role="tab" aria-selected="true">
+                    <!-- Package Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="m7.5 4.27 9 5.15"/>
+                        <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+                        <path d="m3.3 7 8.7 5 8.7-5"/>
+                        <path d="M12 22V12"/>
+                    </svg>
+                    订单自动化
+                </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="monitor-tab" data-bs-toggle="tab" data-bs-target="#monitor" type="button" role="tab">💰 接口余额监控</button>
+                <button class="nav-link" id="monitor-tab" data-bs-toggle="tab" data-bs-target="#monitor" type="button" role="tab" aria-selected="false">
+                    <!-- Chart Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="12" x2="12" y1="20" y2="10"/>
+                        <line x1="18" x2="18" y1="20" y2="4"/>
+                        <line x1="6" x2="6" y1="20" y2="16"/>
+                    </svg>
+                    接口余额监控
+                </button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="sync-tab" data-bs-toggle="tab" data-bs-target="#sync" type="button" role="tab">🔄 订单状态同步</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">⚙️ 全局配置</button>
+                <button class="nav-link" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab" aria-selected="false">
+                    <!-- Settings Icon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
+                    全局配置
+                </button>
             </li>
         </ul>
 
+        <!-- Tab Content -->
         <div class="tab-content" id="myTabContent">
             <!-- Order Automation Tab -->
-            <div class="tab-pane fade show active" id="order" role="tabpanel">
+            <div class="tab-pane fade show active" id="order" role="tabpanel" aria-labelledby="order-tab">
                 <div class="row mb-3">
                     <div class="col-md-12">
-                        <div class="card shadow-sm">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="card-title d-inline-block me-3">服务控制</h5>
-                                    <div class="d-inline-block">
-                                        <span id="order-status-dot" class="status-dot"></span>
-                                        <span id="order-status-text" class="fw-bold text-muted">未知状态</span>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="control-panel">
+                                    <div class="control-info">
+                                        <h5 class="card-title mb-0">服务控制</h5>
+                                        <div class="status-indicator">
+                                            <span id="order-status-dot" class="status-dot"></span>
+                                            <span id="order-status-text">未知状态</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="btn-group" role="group">
-                                    <button onclick="controlService('/api/control', 'start')" class="btn btn-success">启动服务</button>
-                                    <button onclick="controlService('/api/control', 'stop')" class="btn btn-danger">停止服务</button>
-                                    <button onclick="controlService('/api/control', 'restart')" class="btn btn-warning">重启服务</button>
+                                    <div class="btn-group" role="group" aria-label="订单服务控制">
+                                        <button onclick="controlService('/api/control', 'start')" class="btn btn-success">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                                            启动服务
+                                        </button>
+                                        <button onclick="controlService('/api/control', 'stop')" class="btn btn-danger">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                                            停止服务
+                                        </button>
+                                        <button onclick="controlService('/api/control', 'restart')" class="btn btn-warning">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                            重启服务
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>运行日志</span>
+                        <span class="section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            运行日志
+                        </span>
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="orderAutoScroll" checked>
-                            <label class="form-check-label" for="orderAutoScroll">自动滚动</label>
+                            <input class="form-check-input" type="checkbox" id="orderAutoScroll" checked aria-label="自动滚动开关">
+                            <label class="form-check-label small" for="orderAutoScroll">自动滚动</label>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div id="order-log-container" class="log-container">正在获取日志...</div>
+                        <div id="order-log-container" class="log-container" role="log" aria-live="polite">正在获取日志...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Monitor Tab -->
-            <div class="tab-pane fade" id="monitor" role="tabpanel">
+            <div class="tab-pane fade" id="monitor" role="tabpanel" aria-labelledby="monitor-tab">
                 <div class="row mb-3">
                     <div class="col-md-12">
-                        <div class="card shadow-sm">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="card-title d-inline-block me-3">监控控制</h5>
-                                    <div class="d-inline-block">
-                                        <span id="monitor-status-dot" class="status-dot"></span>
-                                        <span id="monitor-status-text" class="fw-bold text-muted">未知状态</span>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="control-panel">
+                                    <div class="control-info">
+                                        <h5 class="card-title mb-0">监控控制</h5>
+                                        <div class="status-indicator">
+                                            <span id="monitor-status-dot" class="status-dot"></span>
+                                            <span id="monitor-status-text">未知状态</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="btn-group" role="group">
-                                    <button onclick="controlService('/api/monitor/control', 'start')" class="btn btn-success">启动监控</button>
-                                    <button onclick="controlService('/api/monitor/control', 'stop')" class="btn btn-danger">停止监控</button>
-                                    <button onclick="controlService('/api/monitor/control', 'restart')" class="btn btn-warning">重启监控</button>
+                                    <div class="btn-group" role="group" aria-label="监控服务控制">
+                                        <button onclick="controlService('/api/monitor/control', 'start')" class="btn btn-success">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="6 3 20 12 6 21 6 3"/></svg>
+                                            启动监控
+                                        </button>
+                                        <button onclick="controlService('/api/monitor/control', 'stop')" class="btn btn-danger">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                                            停止监控
+                                        </button>
+                                        <button onclick="controlService('/api/monitor/control', 'restart')" class="btn btn-warning">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                            重启监控
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="card shadow-sm">
+                <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>监控日志</span>
+                        <span class="section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            监控日志
+                        </span>
                         <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="monitorAutoScroll" checked>
-                            <label class="form-check-label" for="monitorAutoScroll">自动滚动</label>
+                            <input class="form-check-input" type="checkbox" id="monitorAutoScroll" checked aria-label="自动滚动开关">
+                            <label class="form-check-label small" for="monitorAutoScroll">自动滚动</label>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div id="monitor-log-container" class="log-container">正在获取日志...</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sync Tab -->
-            <div class="tab-pane fade" id="sync" role="tabpanel">
-                <div class="row mb-3">
-                    <div class="col-md-12">
-                        <div class="card shadow-sm">
-                            <div class="card-body d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h5 class="card-title d-inline-block me-3">同步控制</h5>
-                                    <div class="d-inline-block">
-                                        <span id="sync-status-dot" class="status-dot"></span>
-                                        <span id="sync-status-text" class="fw-bold text-muted">未知状态</span>
-                                    </div>
-                                </div>
-                                <div class="btn-group" role="group">
-                                    <button onclick="controlService('/api/sync/control', 'start')" class="btn btn-success">启动同步</button>
-                                    <button onclick="controlService('/api/sync/control', 'stop')" class="btn btn-danger">停止同步</button>
-                                    <button onclick="controlService('/api/sync/control', 'restart')" class="btn btn-warning">重启同步</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="card shadow-sm">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>同步日志</span>
-                        <div class="form-check form-switch">
-                            <input class="form-check-input" type="checkbox" id="syncAutoScroll" checked>
-                            <label class="form-check-label" for="syncAutoScroll">自动滚动</label>
-                        </div>
-                    </div>
-                    <div class="card-body p-0">
-                        <div id="sync-log-container" class="log-container">正在获取日志...</div>
+                        <div id="monitor-log-container" class="log-container" role="log" aria-live="polite">正在获取日志...</div>
                     </div>
                 </div>
             </div>
 
             <!-- Config Tab -->
-            <div class="tab-pane fade" id="config" role="tabpanel">
-                <!-- Common Config Section -->
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header">📋 公共配置 (common)</div>
-                    <div class="card-body">
-                        <div class="row mb-2">
-                            <div class="col-md-4">
-                                <label class="form-label">用户名</label>
-                                <input type="text" id="config-username" class="form-control" placeholder="登录用户名">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">密码</label>
-                                <input type="password" id="config-password" class="form-control" placeholder="登录密码">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">无头模式</label>
-                                <div class="form-check form-switch mt-2">
-                                    <input class="form-check-input" type="checkbox" id="config-headless">
-                                    <label class="form-check-label" for="config-headless">启用</label>
+            <div class="tab-pane fade" id="config" role="tabpanel" aria-labelledby="config-tab">
+                <!-- Unsaved Changes Indicator -->
+                <div id="unsaved-indicator" class="unsaved-indicator" style="display: none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                    <span>有未保存的更改</span>
+                </div>
+
+                <!-- Accordion Container -->
+                <div class="accordion" id="configAccordion">
+
+                    <!-- Common Config Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCommon" aria-expanded="true" aria-controls="collapseCommon">
+                                <span class="section-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                    公共配置
+                                </span>
+                                <span class="accordion-badge" id="common-badge">基础登录设置</span>
+                            </button>
+                        </h2>
+                        <div id="collapseCommon" class="accordion-collapse collapse show" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-username">用户名 <span class="text-danger">*</span></label>
+                                        <input type="text" id="config-username" class="form-control" placeholder="登录用户名" required data-section="common">
+                                        <div class="invalid-feedback" id="username-error"></div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-password">密码 <span class="text-danger">*</span></label>
+                                        <div class="input-group">
+                                            <input type="password" id="config-password" class="form-control" placeholder="登录密码" required data-section="common">
+                                            <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('config-password')" aria-label="显示/隐藏密码">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                                            </button>
+                                        </div>
+                                        <div class="invalid-feedback" id="password-error"></div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">无头模式</label>
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="config-headless" data-section="common">
+                                            <label class="form-check-label" for="config-headless">启用无头模式</label>
+                                        </div>
+                                        <small class="text-muted d-block mt-1">启用后浏览器将在后台运行</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <button onclick="saveConfigSection('common')" class="btn btn-sm btn-primary">保存公共配置</button>
                     </div>
-                </div>
 
-                <!-- Order Scanner Config Section -->
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header">📦 订单扫描配置 (order_scanner)</div>
-                    <div class="card-body">
-                        <div class="row mb-2">
-                            <div class="col-md-12">
-                                <label class="form-label">扫描地址</label>
-                                <input type="text" id="config-url" class="form-control" placeholder="订单列表页面 URL">
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-md-12">
-                                <label class="form-label">商户后台地址</label>
-                                <input type="text" id="config-merchant-url" class="form-control" placeholder="商户后台 URL">
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-md-4">
-                                <label class="form-label">扫描间隔 (秒)</label>
-                                <input type="number" id="config-scan-interval" class="form-control" value="60">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">最小间隔 (秒)</label>
-                                <input type="number" id="config-scan-interval-min" class="form-control" value="30">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">最大间隔 (秒)</label>
-                                <input type="number" id="config-scan-interval-max" class="form-control" value="120">
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-md-6">
-                                <label class="form-label">目标平台名称 (用于过滤订单)</label>
-                                <input type="text" id="config-target-platform" class="form-control" placeholder="如: 米奇租赁">
-                                <small class="text-muted">只处理该平台的订单，其他平台订单会被跳过</small>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label">商家列表 (逗号分隔)</label>
-                                <textarea id="config-merchants" class="form-control" rows="2" placeholder="米奇租赁官方,星享生活,团团享租奥丰店"></textarea>
-                                <small class="text-muted">用于关键词映射中的商户下拉选择</small>
-                            </div>
-                        </div>
-                        <button onclick="saveConfigSection('order_scanner')" class="btn btn-sm btn-primary me-2">保存扫描配置</button>
-                    </div>
-                </div>
-
-                <!-- Keyword Mapping Section -->
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>🎯 关键词映射 (权重分配)</span>
-                        <button onclick="addKeywordRow()" class="btn btn-sm btn-success">+ 添加关键词</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="keyword-mapping-table" class="table-responsive">
-                            <table class="table table-bordered align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 150px;">关键词</th>
-                                        <th>商户分配</th>
-                                        <th style="width: 80px;">操作</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="keyword-mapping-body">
-                                    <!-- 动态生成 -->
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="mb-2">
-                            <small class="text-muted">提示：同一关键词可添加多个商户，权重决定分配比例。如权重 2:1 表示 A 分配 2 次，B 分配 1 次，循环轮询。</small>
-                        </div>
-                        <button onclick="saveKeywordMapping()" class="btn btn-sm btn-primary">保存关键词映射</button>
-                    </div>
-                </div>
-
-                <!-- Interface Monitor Config Section -->
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header">💰 接口监控配置 (interface_monitor)</div>
-                    <div class="card-body">
-                        <div class="row mb-2">
-                            <div class="col-md-12">
-                                <label class="form-label">监控地址</label>
-                                <input type="text" id="config-monitor-url" class="form-control" placeholder="接口监控页面 URL">
-                            </div>
-                        </div>
-                        <div class="row mb-2">
-                            <div class="col-md-4">
-                                <label class="form-label">扫描间隔 (秒)</label>
-                                <input type="number" id="config-monitor-scan-interval" class="form-control" value="7200">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Webhook URL</label>
-                                <input type="text" id="config-monitor-webhook" class="form-control" placeholder="通知 Webhook">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">无头模式</label>
-                                <div class="form-check form-switch mt-2">
-                                    <input class="form-check-input" type="checkbox" id="config-monitor-headless">
-                                    <label class="form-check-label" for="config-monitor-headless">启用</label>
+                    <!-- Order Scanner Config Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrder" aria-expanded="false" aria-controls="collapseOrder">
+                                <span class="section-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                                    订单扫描配置
+                                </span>
+                                <span class="accordion-badge" id="order-badge">扫描参数设置</span>
+                            </button>
+                        </h2>
+                        <div id="collapseOrder" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="config-url">扫描地址 <span class="text-danger">*</span></label>
+                                        <input type="url" id="config-url" class="form-control" placeholder="订单列表页面 URL" required data-section="order_scanner">
+                                        <div class="invalid-feedback" id="url-error"></div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="config-merchant-url">商户后台地址</label>
+                                        <input type="url" id="config-merchant-url" class="form-control" placeholder="商户后台 URL" data-section="order_scanner">
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-scan-interval">扫描间隔 (秒)</label>
+                                        <input type="number" id="config-scan-interval" class="form-control" value="60" min="10" max="3600" data-section="order_scanner">
+                                        <small class="text-muted">建议 60-300 秒</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-scan-interval-min">最小间隔 (秒)</label>
+                                        <input type="number" id="config-scan-interval-min" class="form-control" value="30" min="10" data-section="order_scanner">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-scan-interval-max">最大间隔 (秒)</label>
+                                        <input type="number" id="config-scan-interval-max" class="form-control" value="120" min="30" data-section="order_scanner">
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="config-target-platform">目标平台名称</label>
+                                        <input type="text" id="config-target-platform" class="form-control" placeholder="如: 米奇租赁" data-section="order_scanner">
+                                        <small class="text-muted">只处理该平台的订单</small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" for="config-merchants">商家列表</label>
+                                        <textarea id="config-merchants" class="form-control" rows="2" placeholder="米奇租赁官方, 星享生活" data-section="order_scanner"></textarea>
+                                        <small class="text-muted">多个商家用逗号分隔</small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <button onclick="saveConfigSection('interface_monitor')" class="btn btn-sm btn-primary">保存监控配置</button>
                     </div>
-                </div>
 
-                <!-- Advanced Config Section -->
-                <div class="card shadow-sm mb-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>🔧 高级配置 (JSON)</span>
-                        <button onclick="saveAdvancedConfig()" class="btn btn-sm btn-primary">保存高级配置</button>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-4 mb-2">
-                                <label class="form-label">Webhook 配置 (webhook_configs)</label>
-                                <textarea id="config-webhook-configs" class="form-control" style="height: 200px; font-family: monospace;" placeholder="[]"></textarea>
-                            </div>
-                            <div class="col-md-4 mb-2">
-                                <label class="form-label">RPA 群映射 (rpa_group_mapping)</label>
-                                <textarea id="config-rpa-group-mapping" class="form-control" style="height: 200px; font-family: monospace;" placeholder="{}"></textarea>
-                            </div>
-                            <div class="col-md-4 mb-2">
-                                <label class="form-label">监控项配置 (items)</label>
-                                <textarea id="config-monitor-items" class="form-control" style="height: 200px; font-family: monospace;" placeholder="[]"></textarea>
+                    <!-- Keyword Mapping Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseKeyword" aria-expanded="false" aria-controls="collapseKeyword">
+                                <span class="section-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                    关键词映射
+                                </span>
+                                <span class="accordion-badge" id="keyword-badge">0 条规则</span>
+                            </button>
+                        </h2>
+                        <div id="collapseKeyword" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <!-- Search & Add Bar -->
+                                <div class="d-flex gap-2 mb-3 flex-wrap">
+                                    <div class="flex-grow-1" style="min-width: 200px; max-width: 300px;">
+                                        <div class="input-group input-group-sm">
+                                            <span class="input-group-text bg-white">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                            </span>
+                                            <input type="text" id="keyword-search" class="form-control" placeholder="搜索关键词或商户..." oninput="filterKeywords()">
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-sm btn-primary" onclick="openKeywordModal()">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                                        新增映射
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="exportKeywordMapping()" title="导出配置">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Keyword Cards Grid -->
+                                <div id="keyword-cards-container" class="keyword-cards-grid">
+                                    <!-- 动态生成卡片 -->
+                                </div>
+
+                                <!-- Empty State -->
+                                <div id="keyword-empty-state" class="text-center py-5" style="display: none;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                    <p class="text-muted mt-2 mb-0">暂无关键词映射</p>
+                                    <small class="text-muted">点击"新增映射"添加第一条规则</small>
+                                </div>
+
+                                <!-- No Results State -->
+                                <div id="keyword-no-results" class="text-center py-4" style="display: none;">
+                                    <p class="text-muted mb-0">未找到匹配的关键词</p>
+                                </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Interface Monitor Config Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseMonitor" aria-expanded="false" aria-controls="collapseMonitor">
+                                <span class="section-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/></svg>
+                                    接口监控配置
+                                </span>
+                                <span class="accordion-badge" id="monitor-badge">余额监控</span>
+                            </button>
+                        </h2>
+                        <div id="collapseMonitor" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <div class="row g-3">
+                                    <div class="col-md-12">
+                                        <label class="form-label" for="config-monitor-url">监控地址 <span class="text-danger">*</span></label>
+                                        <input type="url" id="config-monitor-url" class="form-control" placeholder="接口监控页面 URL" required data-section="interface_monitor">
+                                        <div class="invalid-feedback" id="monitor-url-error"></div>
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label" for="config-monitor-scan-interval">扫描间隔 (秒)</label>
+                                        <input type="number" id="config-monitor-scan-interval" class="form-control" value="7200" min="300" data-section="interface_monitor">
+                                        <small class="text-muted">建议 7200 秒 (2小时)</small>
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label" for="config-monitor-webhook">Webhook URL</label>
+                                        <input type="url" id="config-monitor-webhook" class="form-control" placeholder="通知 Webhook" data-section="interface_monitor">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">无头模式</label>
+                                        <div class="form-check form-switch mt-2">
+                                            <input class="form-check-input" type="checkbox" id="config-monitor-headless" data-section="interface_monitor">
+                                            <label class="form-check-label" for="config-monitor-headless">启用</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Config Section -->
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdvanced" aria-expanded="false" aria-controls="collapseAdvanced">
+                                <span class="section-title">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2 2 0 0 1-2.83 0l-1.3-1.3a2 2 0 0 1 0-2.83l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                                    高级配置
+                                </span>
+                                <span class="accordion-badge accordion-badge-warning" id="advanced-badge">JSON 编辑</span>
+                            </button>
+                        </h2>
+                        <div id="collapseAdvanced" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" role="alert">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                                    <div>
+                                        <strong>高级用户选项</strong><br>
+                                        <small>JSON 格式配置，修改前请确认格式正确。点击"格式化"按钮可自动整理格式。</small>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label d-flex justify-content-between align-items-center">
+                                            <span>Webhook 配置</span>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="formatJson('config-webhook-configs')" title="格式化 JSON">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                                格式化
+                                            </button>
+                                        </label>
+                                        <textarea id="config-webhook-configs" class="form-control font-monospace" style="height: 160px; font-size: 12px;" placeholder="[]" data-section="advanced"></textarea>
+                                        <div class="invalid-feedback" id="webhook-configs-error"></div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label d-flex justify-content-between align-items-center">
+                                            <span>RPA 群映射</span>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="formatJson('config-rpa-group-mapping')" title="格式化 JSON">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                                格式化
+                                            </button>
+                                        </label>
+                                        <textarea id="config-rpa-group-mapping" class="form-control font-monospace" style="height: 160px; font-size: 12px;" placeholder="{}" data-section="advanced"></textarea>
+                                        <div class="invalid-feedback" id="rpa-group-mapping-error"></div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label d-flex justify-content-between align-items-center">
+                                            <span>监控项配置</span>
+                                            <button class="btn btn-sm btn-outline-secondary" onclick="formatJson('config-monitor-items')" title="格式化 JSON">
+                                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                                                格式化
+                                            </button>
+                                        </label>
+                                        <textarea id="config-monitor-items" class="form-control font-monospace" style="height: 160px; font-size: 12px;" placeholder="[]" data-section="advanced"></textarea>
+                                        <div class="invalid-feedback" id="monitor-items-error"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Floating Save Bar -->
+                <div class="floating-save-bar" id="floatingSaveBar">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2" id="save-status">
+                            <span class="save-status-dot"></span>
+                            <span class="save-status-text">配置已同步</span>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn btn-outline-secondary" onclick="resetAllConfig()" id="btn-reset">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                重置
+                            </button>
+                            <button class="btn btn-primary" onclick="saveAllConfig()" id="btn-save-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                <span>保存全部</span>
+                                <span class="spinner-border spinner-border-sm" style="display: none;" id="save-spinner"></span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <!-- Keyword Edit Modal -->
+    <div class="modal fade" id="keywordModal" tabindex="-1" aria-labelledby="keywordModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="keywordModalLabel">新增关键词映射</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="edit-keyword-original">
+                    <div class="mb-3">
+                        <label class="form-label" for="edit-keyword">关键词 <span class="text-danger">*</span></label>
+                        <input type="text" id="edit-keyword" class="form-control" placeholder="如: G7X3, mini12, pocket3">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">商户分配</label>
+                        <div id="edit-merchants-list" class="edit-merchants-list">
+                            <!-- 动态生成 -->
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addMerchantToEdit()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>
+                        添加商户
+                    </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" onclick="saveKeywordFromModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        保存
+                    </button>
                 </div>
             </div>
         </div>
@@ -326,6 +1259,21 @@
         setInterval(updateTime, 1000);
         setInterval(updateAllStatus, 2000);
         updateAllStatus();
+
+        // Toast notification function
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast-message toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                toast.style.animation = 'slideIn 0.3s reverse cubic-bezier(0.16, 1, 0.3, 1)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
         function updateTime() {
             const now = new Date();
@@ -346,13 +1294,6 @@
                 .then(data => {
                     updateStatusUI('monitor', data);
                 });
-
-            // Update Sync Status
-            fetch('/api/sync/status')
-                .then(response => response.json())
-                .then(data => {
-                    updateStatusUI('sync', data);
-                });
         }
 
         function updateStatusUI(prefix, data) {
@@ -362,18 +1303,18 @@
             if (data.running) {
                 dot.className = 'status-dot status-running';
                 text.textContent = '运行中';
-                text.className = 'fw-bold text-success';
+                text.style.color = '#10B981';
             } else {
                 dot.className = 'status-dot status-stopped';
                 text.textContent = '已停止';
-                text.className = 'fw-bold text-danger';
+                text.style.color = '#EF4444';
             }
 
             // Update logs
             const logContainer = document.getElementById(prefix + '-log-container');
             const isAutoScroll = document.getElementById(prefix + 'AutoScroll').checked;
 
-            // Only update if content changed to avoid flickering/performance issues (simple check)
+            // Only update if content changed to avoid flickering/performance issues
             const newContent = data.logs.join('<br>');
             if (logContainer.innerHTML !== newContent) {
                 logContainer.innerHTML = newContent;
@@ -391,7 +1332,7 @@
             })
             .then(response => response.json())
             .then(data => {
-                alert(data.message);
+                showToast(data.message, data.status === 'success' ? 'success' : 'error');
                 updateAllStatus();
             });
         }
@@ -401,6 +1342,316 @@
         // Keyword Mapping State
         let keywordMappingData = {};
         let merchantList = [];
+        let originalConfig = {}; // For reset functionality
+        let hasUnsavedChanges = false;
+
+        // Track form changes
+        function setupChangeTracking() {
+            const inputs = document.querySelectorAll('#config input, #config textarea, #config select');
+            inputs.forEach(input => {
+                input.addEventListener('change', markAsChanged);
+                input.addEventListener('input', markAsChanged);
+            });
+        }
+
+        function markAsChanged() {
+            hasUnsavedChanges = true;
+            updateSaveStatus();
+        }
+
+        function updateSaveStatus(saved = false) {
+            const indicator = document.getElementById('unsaved-indicator');
+            const statusDot = document.querySelector('.save-status-dot');
+            const statusText = document.querySelector('.save-status-text');
+
+            if (saved) {
+                hasUnsavedChanges = false;
+                indicator.style.display = 'none';
+                statusDot.classList.remove('unsaved');
+                statusText.textContent = '配置已同步';
+            } else if (hasUnsavedChanges) {
+                indicator.style.display = 'flex';
+                statusDot.classList.add('unsaved');
+                statusText.textContent = '有未保存的更改';
+            }
+        }
+
+        // Password toggle
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        // JSON formatter
+        function formatJson(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            try {
+                const parsed = JSON.parse(textarea.value);
+                textarea.value = JSON.stringify(parsed, null, 2);
+                textarea.classList.remove('is-invalid');
+                showToast('JSON 已格式化', 'success');
+            } catch (e) {
+                textarea.classList.add('is-invalid');
+                const errorId = textareaId + '-error';
+                const errorEl = document.getElementById(errorId);
+                if (errorEl) errorEl.textContent = 'JSON 格式错误: ' + e.message;
+                showToast('JSON 格式错误', 'error');
+            }
+        }
+
+        // Validate JSON on blur
+        function validateJsonOnBlur(textareaId) {
+            const textarea = document.getElementById(textareaId);
+            if (!textarea.value.trim()) return true;
+            try {
+                JSON.parse(textarea.value);
+                textarea.classList.remove('is-invalid');
+                return true;
+            } catch (e) {
+                textarea.classList.add('is-invalid');
+                return false;
+            }
+        }
+
+        // Update keyword badge count
+        function updateKeywordBadge() {
+            const count = Object.keys(keywordMappingData).length;
+            const badge = document.getElementById('keyword-badge');
+            if (badge) {
+                badge.textContent = count + ' 条规则';
+            }
+        }
+
+        // Render keyword cards (new card-based layout)
+        function renderKeywordMappingTable() {
+            const container = document.getElementById('keyword-cards-container');
+            const emptyState = document.getElementById('keyword-empty-state');
+            const noResults = document.getElementById('keyword-no-results');
+
+            container.innerHTML = '';
+            const keywords = Object.entries(keywordMappingData);
+
+            // Show/hide empty state
+            if (keywords.length === 0) {
+                emptyState.style.display = 'block';
+                noResults.style.display = 'none';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+
+            keywords.forEach(([keyword, merchants]) => {
+                const card = createKeywordCard(keyword, merchants);
+                container.appendChild(card);
+            });
+
+            updateKeywordBadge();
+        }
+
+        // Create a keyword card
+        function createKeywordCard(keyword, merchants) {
+            const card = document.createElement('div');
+            card.className = 'keyword-card';
+            card.dataset.keyword = keyword;
+            card.onclick = function(e) {
+                if (!e.target.closest('.keyword-card-delete')) {
+                    openKeywordModal(keyword);
+                }
+            };
+
+            // Header with title and delete button
+            const header = document.createElement('div');
+            header.className = 'keyword-card-header';
+
+            const title = document.createElement('div');
+            title.className = 'keyword-card-title';
+            title.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" x2="7.01" y1="7" y2="7"/></svg>
+                ${keyword}
+            `;
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'keyword-card-delete';
+            deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>';
+            deleteBtn.title = '删除';
+            deleteBtn.onclick = function(e) {
+                e.stopPropagation();
+                if (confirm('确定删除关键词 "' + keyword + '" 吗？')) {
+                    delete keywordMappingData[keyword];
+                    renderKeywordMappingTable();
+                    markAsChanged();
+                    showToast('已删除: ' + keyword, 'success');
+                }
+            };
+
+            header.appendChild(title);
+            header.appendChild(deleteBtn);
+
+            // Tags container
+            const tags = document.createElement('div');
+            tags.className = 'keyword-card-tags';
+
+            merchants.forEach(m => {
+                const tag = document.createElement('span');
+                tag.className = 'merchant-tag';
+                tag.innerHTML = `
+                    <span class="merchant-tag-name" title="${m.merchant}">${m.merchant}</span>
+                    <span class="merchant-tag-weight">${m.weight}</span>
+                `;
+                tags.appendChild(tag);
+            });
+
+            card.appendChild(header);
+            card.appendChild(tags);
+
+            return card;
+        }
+
+        // Filter keywords by search
+        function filterKeywords() {
+            const search = document.getElementById('keyword-search').value.toLowerCase().trim();
+            const cards = document.querySelectorAll('.keyword-card');
+            const noResults = document.getElementById('keyword-no-results');
+            const emptyState = document.getElementById('keyword-empty-state');
+
+            let visibleCount = 0;
+
+            cards.forEach(card => {
+                const keyword = card.dataset.keyword.toLowerCase();
+                const tags = Array.from(card.querySelectorAll('.merchant-tag-name')).map(t => t.textContent.toLowerCase());
+                const matches = keyword.includes(search) || tags.some(t => t.includes(search));
+                card.style.display = matches ? '' : 'none';
+                if (matches) visibleCount++;
+            });
+
+            // Show no results if filtered and none visible
+            if (search && visibleCount === 0 && Object.keys(keywordMappingData).length > 0) {
+                noResults.style.display = 'block';
+            } else {
+                noResults.style.display = 'none';
+            }
+        }
+
+        // Open modal for add/edit
+        function openKeywordModal(keyword = null) {
+            const modal = new bootstrap.Modal(document.getElementById('keywordModal'));
+            const title = document.getElementById('keywordModalLabel');
+            const keywordInput = document.getElementById('edit-keyword');
+            const originalInput = document.getElementById('edit-keyword-original');
+            const merchantsList = document.getElementById('edit-merchants-list');
+
+            if (keyword && keywordMappingData[keyword]) {
+                // Edit mode
+                title.textContent = '编辑关键词映射';
+                keywordInput.value = keyword;
+                originalInput.value = keyword;
+                renderEditMerchants(keywordMappingData[keyword]);
+            } else {
+                // Add mode
+                title.textContent = '新增关键词映射';
+                keywordInput.value = '';
+                originalInput.value = '';
+                renderEditMerchants([{ merchant: '', weight: 1 }]);
+            }
+
+            modal.show();
+            setTimeout(() => keywordInput.focus(), 200);
+        }
+
+        // Render merchants in modal
+        function renderEditMerchants(merchants) {
+            const container = document.getElementById('edit-merchants-list');
+            container.innerHTML = '';
+
+            merchants.forEach((m, index) => {
+                const row = document.createElement('div');
+                row.className = 'edit-merchant-row';
+                row.innerHTML = `
+                    <select class="form-select form-select-sm" aria-label="选择商户">
+                        <option value="">选择商户...</option>
+                        ${merchantList.map(opt => `<option value="${opt}" ${opt === m.merchant ? 'selected' : ''}>${opt}</option>`).join('')}
+                    </select>
+                    <input type="number" class="form-control form-control-sm" value="${m.weight}" min="1" placeholder="权重" aria-label="权重">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()" title="移除">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                    </button>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        // Add merchant row in modal
+        function addMerchantToEdit() {
+            const container = document.getElementById('edit-merchants-list');
+            const row = document.createElement('div');
+            row.className = 'edit-merchant-row';
+            row.innerHTML = `
+                <select class="form-select form-select-sm" aria-label="选择商户">
+                    <option value="">选择商户...</option>
+                    ${merchantList.map(opt => `<option value="${opt}">${opt}</option>`).join('')}
+                </select>
+                <input type="number" class="form-control form-control-sm" value="1" min="1" placeholder="权重" aria-label="权重">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()" title="移除">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>
+                </button>
+            `;
+            container.appendChild(row);
+        }
+
+        // Save keyword from modal
+        function saveKeywordFromModal() {
+            const keyword = document.getElementById('edit-keyword').value.trim();
+            const original = document.getElementById('edit-keyword-original').value;
+            const rows = document.querySelectorAll('.edit-merchant-row');
+
+            if (!keyword) {
+                showToast('请输入关键词', 'error');
+                return;
+            }
+
+            const merchants = [];
+            rows.forEach(row => {
+                const select = row.querySelector('select');
+                const input = row.querySelector('input[type="number"]');
+                const merchant = select.value.trim();
+                const weight = parseInt(input.value) || 1;
+
+                if (merchant && weight >= 1) {
+                    merchants.push({ merchant, weight });
+                }
+            });
+
+            if (merchants.length === 0) {
+                showToast('请至少添加一个商户', 'error');
+                return;
+            }
+
+            // If editing and keyword changed, delete old
+            if (original && original !== keyword) {
+                delete keywordMappingData[original];
+            }
+
+            keywordMappingData[keyword] = merchants;
+            renderKeywordMappingTable();
+            markAsChanged();
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('keywordModal')).hide();
+            showToast(original ? '已更新: ' + keyword : '已添加: ' + keyword, 'success');
+        }
+
+        // Export keyword mapping as JSON
+        function exportKeywordMapping() {
+            const dataStr = JSON.stringify(keywordMappingData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'keyword_mapping_' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('配置已导出', 'success');
+        }
 
         // Load all config sections
         function loadAllConfigSections() {
@@ -410,6 +1661,7 @@
                     document.getElementById('config-username').value = data.username || '';
                     document.getElementById('config-password').value = data.password || '';
                     document.getElementById('config-headless').checked = data.headless !== false;
+                    originalConfig.common = { ...data };
                 });
 
             fetch('/api/config/order_scanner')
@@ -421,9 +1673,9 @@
                     document.getElementById('config-scan-interval-min').value = data.scan_interval_min || 30;
                     document.getElementById('config-scan-interval-max').value = data.scan_interval_max || 120;
                     document.getElementById('config-target-platform').value = data.target_platform || '米奇租赁';
-                    // 商家列表是数组，转为逗号分隔字符串
                     const merchants = data.merchants || [];
                     document.getElementById('config-merchants').value = merchants.join(', ');
+                    originalConfig.order_scanner = { ...data };
                 });
 
             fetch('/api/config/keyword_mapping')
@@ -431,6 +1683,8 @@
                 .then(data => {
                     keywordMappingData = data;
                     renderKeywordMappingTable();
+                    updateKeywordBadge();
+                    originalConfig.keyword_mapping = { ...data };
                 });
 
             fetch('/api/config/interface_monitor')
@@ -440,6 +1694,7 @@
                     document.getElementById('config-monitor-scan-interval').value = data.scan_interval || 7200;
                     document.getElementById('config-monitor-webhook').value = data.webhook_url || '';
                     document.getElementById('config-monitor-headless').checked = data.headless !== false;
+                    originalConfig.interface_monitor = { ...data };
                 });
 
             fetch('/api/config/advanced')
@@ -448,6 +1703,7 @@
                     document.getElementById('config-webhook-configs').value = JSON.stringify(data.webhook_configs || [], null, 2);
                     document.getElementById('config-rpa-group-mapping').value = JSON.stringify(data.rpa_group_mapping || {}, null, 2);
                     document.getElementById('config-monitor-items').value = JSON.stringify(data.items || [], null, 2);
+                    originalConfig.advanced = { ...data };
                 });
 
             fetch('/api/merchants')
@@ -455,195 +1711,59 @@
                 .then(data => {
                     merchantList = data;
                 });
+
+            // Setup change tracking after load
+            setTimeout(setupChangeTracking, 500);
         }
 
-        // Render keyword mapping table
-        function renderKeywordMappingTable() {
-            const tbody = document.getElementById('keyword-mapping-body');
-            tbody.innerHTML = '';
+        // Save all config
+        async function saveAllConfig() {
+            const btnSave = document.getElementById('btn-save-all');
+            const spinner = document.getElementById('save-spinner');
+            const btnText = btnSave.querySelector('span:not(.spinner-border)');
 
-            for (const [keyword, merchants] of Object.entries(keywordMappingData)) {
-                const row = createKeywordRow(keyword, merchants);
-                tbody.appendChild(row);
-            }
-        }
+            // Show loading state
+            btnSave.disabled = true;
+            spinner.style.display = 'inline-block';
+            if (btnText) btnText.textContent = '保存中...';
 
-        // Create a keyword row
-        function createKeywordRow(keyword, merchants) {
-            const tr = document.createElement('tr');
-            tr.dataset.keyword = keyword;
-
-            // Keyword cell
-            const tdKeyword = document.createElement('td');
-            const inputKeyword = document.createElement('input');
-            inputKeyword.type = 'text';
-            inputKeyword.className = 'form-control';
-            inputKeyword.value = keyword;
-            inputKeyword.placeholder = '关键词';
-            inputKeyword.onchange = function() {
-                updateKeywordRow(tr);
-            };
-            tdKeyword.appendChild(inputKeyword);
-            tr.appendChild(tdKeyword);
-
-            // Merchants cell
-            const tdMerchants = document.createElement('td');
-            const merchantsContainer = document.createElement('div');
-            merchantsContainer.className = 'merchants-container';
-
-            for (const merchant of merchants) {
-                const merchantDiv = createMerchantDiv(merchant.merchant, merchant.weight);
-                merchantsContainer.appendChild(merchantDiv);
-            }
-
-            // Add merchant button
-            const addBtn = document.createElement('button');
-            addBtn.className = 'btn btn-sm btn-outline-success ms-2';
-            addBtn.textContent = '+ 添加商户';
-            addBtn.onclick = function() {
-                const newDiv = createMerchantDiv('', 1);
-                merchantsContainer.insertBefore(newDiv, addBtn);
-            };
-            merchantsContainer.appendChild(addBtn);
-
-            tdMerchants.appendChild(merchantsContainer);
-            tr.appendChild(tdMerchants);
-
-            // Action cell
-            const tdAction = document.createElement('td');
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-sm btn-danger';
-            deleteBtn.textContent = '删除';
-            deleteBtn.onclick = function() {
-                deleteKeywordRow(keyword);
-            };
-            tdAction.appendChild(deleteBtn);
-            tr.appendChild(tdAction);
-
-            return tr;
-        }
-
-        // Create merchant div with input and weight
-        function createMerchantDiv(merchantName, weight) {
-            const div = document.createElement('div');
-            div.className = 'd-flex align-items-center mb-1';
-
-            const selectMerchant = document.createElement('select');
-            selectMerchant.className = 'form-select form-select-sm me-2';
-            selectMerchant.style.width = '200px';
-
-            // Add options from merchant list
-            const defaultOption = document.createElement('option');
-            defaultOption.value = '';
-            defaultOption.textContent = '选择商户...';
-            selectMerchant.appendChild(defaultOption);
-
-            for (const m of merchantList) {
-                const option = document.createElement('option');
-                option.value = m;
-                option.textContent = m;
-                if (m === merchantName) option.selected = true;
-                selectMerchant.appendChild(option);
-            }
-
-            // If merchant not in list, add it
-            if (merchantName && !merchantList.includes(merchantName)) {
-                const option = document.createElement('option');
-                option.value = merchantName;
-                option.textContent = merchantName;
-                option.selected = true;
-                selectMerchant.appendChild(option);
-            }
-
-            const weightInput = document.createElement('input');
-            weightInput.type = 'number';
-            weightInput.className = 'form-control form-control-sm me-2';
-            weightInput.style.width = '80px';
-            weightInput.value = weight;
-            weightInput.placeholder = '权重';
-            weightInput.min = 1;
-
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'btn btn-sm btn-outline-danger';
-            removeBtn.textContent = '×';
-            removeBtn.onclick = function() {
-                div.remove();
-            };
-
-            div.appendChild(selectMerchant);
-            div.appendChild(weightInput);
-            div.appendChild(removeBtn);
-
-            return div;
-        }
-
-        // Add new keyword row
-        function addKeywordRow() {
-            const tbody = document.getElementById('keyword-mapping-body');
-            const newRow = createKeywordRow('', [{"merchant": "", "weight": 1}]);
-            tbody.appendChild(newRow);
-        }
-
-        // Update keyword row when keyword changes
-        function updateKeywordRow(tr) {
-            const inputKeyword = tr.querySelector('td:first-child input');
-            tr.dataset.keyword = inputKeyword.value;
-        }
-
-        // Delete keyword row
-        function deleteKeywordRow(keyword) {
-            delete keywordMappingData[keyword];
-            renderKeywordMappingTable();
-        }
-
-        // Save keyword mapping
-        function saveKeywordMapping() {
-            const tbody = document.getElementById('keyword-mapping-body');
-            const newMapping = {};
-
-            for (const row of tbody.rows) {
-                const keywordInput = row.querySelector('td:first-child input');
-                const keyword = keywordInput.value.trim();
-                if (!keyword) continue;
-
-                const merchantsContainer = row.querySelector('.merchants-container');
-                const merchantDivs = merchantsContainer.querySelectorAll('div.d-flex');
-
-                const merchants = [];
-                for (const div of merchantDivs) {
-                    const select = div.querySelector('select');
-                    const weightInput = div.querySelector('input[type="number"]');
-                    const merchant = select.value.trim();
-                    const weight = parseInt(weightInput.value) || 1;
-
-                    if (merchant && weight >= 1) {
-                        merchants.push({"merchant": merchant, "weight": weight});
+            try {
+                // Validate JSON fields
+                const jsonFields = ['config-webhook-configs', 'config-rpa-group-mapping', 'config-monitor-items'];
+                for (const fieldId of jsonFields) {
+                    if (!validateJsonOnBlur(fieldId)) {
+                        throw new Error('JSON 格式错误，请检查高级配置');
                     }
                 }
 
-                if (merchants.length > 0) {
-                    newMapping[keyword] = merchants;
-                }
-            }
+                // Save all sections
+                const results = await Promise.all([
+                    saveConfigSectionAsync('common'),
+                    saveConfigSectionAsync('order_scanner'),
+                    saveConfigSectionAsync('interface_monitor'),
+                    saveKeywordMappingAsync(),
+                    saveAdvancedConfigAsync()
+                ]);
 
-            fetch('/api/config/keyword_mapping', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newMapping)
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    alert('关键词映射已保存！');
-                    keywordMappingData = newMapping;
+                const failed = results.filter(r => !r.success);
+                if (failed.length > 0) {
+                    showToast(`${failed.length} 个配置保存失败`, 'error');
                 } else {
-                    alert('保存失败: ' + data.message);
+                    showToast('所有配置已保存！', 'success');
+                    updateSaveStatus(true);
                 }
-            });
+            } catch (e) {
+                showToast(e.message || '保存失败', 'error');
+            } finally {
+                // Reset button state
+                btnSave.disabled = false;
+                spinner.style.display = 'none';
+                if (btnText) btnText.textContent = '保存全部';
+            }
         }
 
-        // Save config section
-        function saveConfigSection(section) {
+        // Async save functions
+        function saveConfigSectionAsync(section) {
             let data = {};
 
             if (section === 'common') {
@@ -653,7 +1773,6 @@
                     headless: document.getElementById('config-headless').checked
                 };
             } else if (section === 'order_scanner') {
-                // 商家列表从逗号分隔字符串转为数组
                 const merchantsStr = document.getElementById('config-merchants').value;
                 const merchants = merchantsStr.split(',').map(m => m.trim()).filter(m => m);
                 data = {
@@ -674,29 +1793,37 @@
                 };
             }
 
-            fetch('/api/config/' + section, {
+            return fetch('/api/config/' + section, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             })
             .then(response => response.json())
+            .then(data => ({ section, success: data.status === 'success' }));
+        }
+
+        function saveKeywordMappingAsync() {
+            return fetch('/api/config/keyword_mapping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(keywordMappingData)
+            })
+            .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    alert(section + ' 配置已保存！');
-                } else {
-                    alert('保存失败: ' + data.message);
+                    updateKeywordBadge();
                 }
+                return { section: 'keyword_mapping', success: data.status === 'success' };
             });
         }
 
-        // Save advanced config
-        function saveAdvancedConfig() {
+        function saveAdvancedConfigAsync() {
             try {
-                const webhookConfigs = JSON.parse(document.getElementById('config-webhook-configs').value);
-                const rpaGroupMapping = JSON.parse(document.getElementById('config-rpa-group-mapping').value);
-                const items = JSON.parse(document.getElementById('config-monitor-items').value);
+                const webhookConfigs = JSON.parse(document.getElementById('config-webhook-configs').value || '[]');
+                const rpaGroupMapping = JSON.parse(document.getElementById('config-rpa-group-mapping').value || '{}');
+                const items = JSON.parse(document.getElementById('config-monitor-items').value || '[]');
 
-                fetch('/api/config/advanced', {
+                return fetch('/api/config/advanced', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -706,17 +1833,33 @@
                     })
                 })
                 .then(response => response.json())
-                .then(data => {
-                    if (data.status === 'success') {
-                        alert('高级配置已保存！');
-                    } else {
-                        alert('保存失败: ' + data.message);
-                    }
-                });
+                .then(data => ({ section: 'advanced', success: data.status === 'success' }));
             } catch (e) {
-                alert('JSON 格式错误: ' + e);
+                return Promise.resolve({ section: 'advanced', success: false });
             }
         }
+
+        // Reset all config
+        function resetAllConfig() {
+            if (!confirm('确定要重置所有未保存的更改吗？')) return;
+
+            loadAllConfigSections();
+            updateSaveStatus(true);
+            showToast('已重置为上次保存的配置', 'success');
+        }
+
+        // Warn before leaving with unsaved changes
+        window.addEventListener('beforeunload', function(e) {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllConfigSections();
+        });
     </script>
 </body>
 </html>

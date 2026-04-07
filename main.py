@@ -958,7 +958,7 @@ class OrderScanner:
                                 continue
 
                             merchant_top[merchant_name_clean] = merchant_top.get(merchant_name_clean, 0) + 1
-                            
+
                             if merchant_name_clean != target_platform:
                                 scan_stats["merchant_non_target"] += 1
                                 if scan_stats["merchant_non_target"] <= 6:

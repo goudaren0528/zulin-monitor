@@ -3,21 +3,29 @@ import os
 import json
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from sync_orders import order_sync, SYNC_LOG_BUFFER
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 
+def _get_config_path():
+    """获取优先使用的配置文件路径"""
+    candidates = ["config.local.json", "config.json"]
+    for pth in candidates:
+        if os.path.exists(pth):
+            return pth
+    # 如果都不存在，默认使用 config.local.json
+    return "config.local.json"
+
 def _load_full_config():
     """加载完整配置文件"""
-    config_path = "config.json"
+    config_path = _get_config_path()
     if os.path.exists(config_path):
         with open(config_path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
 
 def _save_full_config(config):
-    """保存完整配置文件"""
-    config_path = "config.json"
+    """保存完整配置文件（保存到 config.local.json）"""
+    config_path = "config.local.json"
     with open(config_path, 'w', encoding='utf-8') as f:
         json.dump(config, f, indent=4, ensure_ascii=False)
 
@@ -73,46 +81,23 @@ def control_monitor():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# --- Sync API ---
-@app.route('/api/sync/status')
-def get_sync_status():
-    return jsonify({
-        'running': order_sync.running,
-        'logs': SYNC_LOG_BUFFER[-50:]
-    })
-
-@app.route('/api/sync/control', methods=['POST'])
-def control_sync():
-    action = request.json.get('action')
-    try:
-        if action == 'start':
-            order_sync.start()
-        elif action == 'stop':
-            order_sync.stop()
-        elif action == 'restart':
-            order_sync.restart()
-        else:
-            return jsonify({'status': 'error', 'message': '无效的操作'}), 400
-        return jsonify({'status': 'success', 'message': f'同步服务已执行操作: {action}'})
-    except Exception as e:
-        return jsonify({'status': 'error', 'message': str(e)}), 500
-
 # --- Shared Config API ---
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
-    config_path = "config.json"
+    config_path = _get_config_path()
     if request.method == 'GET':
         if os.path.exists(config_path):
             with open(config_path, 'r', encoding='utf-8') as f:
                 return jsonify(json.load(f))
         return jsonify({})
-    
+
     elif request.method == 'POST':
         new_config = request.json
         try:
             # Validate JSON
             json.dumps(new_config)
-            with open(config_path, 'w', encoding='utf-8') as f:
+            # 保存到 config.local.json
+            with open("config.local.json", 'w', encoding='utf-8') as f:
                 json.dump(new_config, f, indent=4, ensure_ascii=False)
             return jsonify({'status': 'success', 'message': '配置已保存'})
         except Exception as e:
