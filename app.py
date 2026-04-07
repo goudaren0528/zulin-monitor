@@ -1,10 +1,14 @@
 from flask import Flask, render_template, jsonify, request
 import os
 import json
+import threading
+import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
+config_lock = threading.Lock()
 
 def _get_config_path():
     """获取优先使用的配置文件路径"""
@@ -16,18 +20,20 @@ def _get_config_path():
     return "config.local.json"
 
 def _load_full_config():
-    """加载完整配置文件"""
+    """加载完整配置文件（带锁确保一致性）"""
     config_path = _get_config_path()
-    if os.path.exists(config_path):
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
+    with config_lock:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
 
 def _save_full_config(config):
-    """保存完整配置文件（保存到 config.local.json）"""
+    """保存完整配置文件（带锁防止并发冲突）"""
     config_path = "config.local.json"
-    with open(config_path, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=4, ensure_ascii=False)
+    with config_lock:
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4, ensure_ascii=False)
 
 @app.route('/')
 def index():
@@ -155,11 +161,13 @@ def handle_config_keyword_mapping():
         normalized = {}
         for keyword, value in keyword_mapping.items():
             if isinstance(value, str):
-                normalized[keyword] = [{"merchant": value, "weight": 1}]
+                normalized[keyword] = {"product": "", "merchants": [{"merchant": value, "weight": 1}]}
             elif isinstance(value, list):
+                normalized[keyword] = {"product": "", "merchants": value}
+            elif isinstance(value, dict):
                 normalized[keyword] = value
             else:
-                normalized[keyword] = [{"merchant": str(value), "weight": 1}]
+                normalized[keyword] = {"product": "", "merchants": [{"merchant": str(value), "weight": 1}]}
         return jsonify(normalized)
     elif request.method == 'POST':
         new_mapping = request.json
@@ -253,6 +261,92 @@ def get_merchants():
 
 # --- Mock External API ---
 # (Removed: External API should be implemented in the Next.js project on port 3000)
+
+# --- Statistics API ---
+@app.route('/api/stats/daily')
+def get_daily_statistics():
+    """获取指定日期各商家分单数量"""
+    date = request.args.get('date', '')
+    from datetime import datetime
+    if not date:
+        date = datetime.now().strftime('%Y-%m-%d')
+
+    stats = get_daily_stats(date=date)
+    total_count = sum(s['count'] for s in stats)
+
+    # 获取累计数据
+    totals = get_merchant_totals()
+    totals_dict = {t['merchant']: t['total'] for t in totals}
+
+    # 合并当日和累计数据
+    result = []
+    for s in stats:
+        result.append({
+            'merchant': s['merchant'],
+            'daily_count': s['count'],
+            'total_count': totals_dict.get(s['merchant'], 0)
+        })
+
+    # 补充当日无分单但有累计的商家
+    merchants_with_daily = {s['merchant'] for s in stats}
+    for t in totals:
+        if t['merchant'] not in merchants_with_daily:
+            result.append({
+                'merchant': t['merchant'],
+                'daily_count': 0,
+                'total_count': t['total']
+            })
+
+    return jsonify({
+        'date': date,
+        'total': total_count,
+        'merchants': result
+    })
+
+@app.route('/api/stats/records')
+def get_assignment_records():
+    """获取分单记录列表"""
+    date = request.args.get('date', '')
+    merchant = request.args.get('merchant', '')
+    limit = int(request.args.get('limit', 100))
+
+    if not os.path.exists(DB_PATH):
+        return jsonify({'records': []})
+
+    with db_lock:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        query = "SELECT created_at, keyword_entry, matched_keyword, merchant, product, order_no, order_title FROM assignment_records"
+        conditions = []
+        params = []
+
+        if date:
+            conditions.append("created_at LIKE ?")
+            params.append(date + "%")
+        if merchant:
+            conditions.append("merchant = ?")
+            params.append(merchant)
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY created_at DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        records = [{
+            'created_at': row[0],
+            'keyword_entry': row[1],
+            'matched_keyword': row[2],
+            'merchant': row[3],
+            'product': row[4],
+            'order_no': row[5],
+            'order_title': row[6]
+        } for row in cursor.fetchall()]
+        conn.close()
+
+    return jsonify({'records': records})
 
 if __name__ == '__main__':
     # Listen on all interfaces for Docker
