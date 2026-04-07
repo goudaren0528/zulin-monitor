@@ -239,6 +239,28 @@ def _normalize_keyword_mapping(keyword_mapping):
     return normalized
 
 
+def _match_keyword(keyword_entry, text_content):
+    """
+    检查关键词条目是否匹配文本内容。
+    支持逗号分隔的多个关键词，大小写不敏感。
+
+    Args:
+        keyword_entry: 关键词条目，可以是单个关键词或逗号分隔的多个关键词
+        text_content: 要匹配的文本内容（已转小写）
+
+    Returns:
+        (bool, str): (是否匹配, 匹配到的具体关键词)
+    """
+    # 分割关键词（支持中英文逗号）
+    keywords = [k.strip() for k in keyword_entry.replace('，', ',').split(',') if k.strip()]
+
+    for kw in keywords:
+        if kw.lower() in text_content:
+            return True, kw
+
+    return False, None
+
+
 def _build_weight_sequence(merchant_list):
     """
     根据权重构建轮询序列。
@@ -1010,11 +1032,15 @@ class OrderScanner:
                             # 规范化 keyword_mapping
                             normalized_mapping = _normalize_keyword_mapping(keyword_mapping)
 
-                            for keyword, merchant_list in normalized_mapping.items():
-                                if keyword in text_content:
-                                    matched_keyword = keyword
-                                    target_option, round_info = self._get_merchant_by_weight(keyword, merchant_list)
-                                    matched_info = f"关键词匹配: {keyword}, {round_info}"
+                            # 将文本内容转为小写用于匹配
+                            text_content_lower = text_content.lower()
+
+                            for keyword_entry, merchant_list in normalized_mapping.items():
+                                matched, matched_kw = _match_keyword(keyword_entry, text_content_lower)
+                                if matched:
+                                    matched_keyword = keyword_entry
+                                    target_option, round_info = self._get_merchant_by_weight(keyword_entry, merchant_list)
+                                    matched_info = f"关键词匹配: {matched_kw} (规则: {keyword_entry}), {round_info}"
                                     break
 
                             log(f"匹配结果: [{matched_info}] -> 分配给: [{target_option}]")

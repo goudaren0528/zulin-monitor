@@ -769,6 +769,31 @@
         .input-group-text {
             border-color: var(--color-border);
         }
+
+        /* Keyword Tags in Card */
+        .keyword-keywords-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 10px;
+        }
+
+        .keyword-keyword-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            background-color: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.2);
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--color-primary);
+        }
+
+        .keyword-card-header {
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body>
@@ -1228,7 +1253,8 @@
                     <input type="hidden" id="edit-keyword-original">
                     <div class="mb-3">
                         <label class="form-label" for="edit-keyword">关键词 <span class="text-danger">*</span></label>
-                        <input type="text" id="edit-keyword" class="form-control" placeholder="如: G7X3, mini12, pocket3">
+                        <input type="text" id="edit-keyword" class="form-control" placeholder="如: G7X3, g7x3, G7X-3">
+                        <small class="text-muted">多个关键词用逗号分隔，匹配时不区分大小写</small>
                     </div>
                     <div class="mb-2">
                         <label class="form-label">商户分配</label>
@@ -1459,37 +1485,42 @@
                 }
             };
 
-            // Header with title and delete button
+            // Header with delete button
             const header = document.createElement('div');
             header.className = 'keyword-card-header';
 
-            const title = document.createElement('div');
-            title.className = 'keyword-card-title';
-            title.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" x2="7.01" y1="7" y2="7"/></svg>
-                ${keyword}
-            `;
-
+            // Delete button
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'keyword-card-delete';
             deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" x2="6" y1="6" y2="18"/><line x1="6" x2="18" y1="6" y2="18"/></svg>';
             deleteBtn.title = '删除';
             deleteBtn.onclick = function(e) {
                 e.stopPropagation();
-                if (confirm('确定删除关键词 "' + keyword + '" 吗？')) {
+                if (confirm('确定删除此映射规则吗？')) {
                     delete keywordMappingData[keyword];
                     renderKeywordMappingTable();
                     markAsChanged();
-                    showToast('已删除: ' + keyword, 'success');
+                    showToast('已删除映射规则', 'success');
                 }
             };
 
-            header.appendChild(title);
             header.appendChild(deleteBtn);
 
-            // Tags container
-            const tags = document.createElement('div');
-            tags.className = 'keyword-card-tags';
+            // Keywords container - split by comma and show as tags
+            const keywordsDiv = document.createElement('div');
+            keywordsDiv.className = 'keyword-keywords-list';
+
+            const keywordList = keyword.split(/[,，]/).map(k => k.trim()).filter(k => k);
+            keywordList.forEach((kw, idx) => {
+                const kwTag = document.createElement('span');
+                kwTag.className = 'keyword-keyword-tag';
+                kwTag.textContent = kw;
+                keywordsDiv.appendChild(kwTag);
+            });
+
+            // Merchants tags container
+            const merchantTags = document.createElement('div');
+            merchantTags.className = 'keyword-card-tags';
 
             merchants.forEach(m => {
                 const tag = document.createElement('span');
@@ -1498,11 +1529,12 @@
                     <span class="merchant-tag-name" title="${m.merchant}">${m.merchant}</span>
                     <span class="merchant-tag-weight">${m.weight}</span>
                 `;
-                tags.appendChild(tag);
+                merchantTags.appendChild(tag);
             });
 
             card.appendChild(header);
-            card.appendChild(tags);
+            card.appendChild(keywordsDiv);
+            card.appendChild(merchantTags);
 
             return card;
         }
@@ -1600,12 +1632,23 @@
 
         // Save keyword from modal
         function saveKeywordFromModal() {
-            const keyword = document.getElementById('edit-keyword').value.trim();
+            const keywordRaw = document.getElementById('edit-keyword').value.trim();
             const original = document.getElementById('edit-keyword-original').value;
             const rows = document.querySelectorAll('.edit-merchant-row');
 
-            if (!keyword) {
+            if (!keywordRaw) {
                 showToast('请输入关键词', 'error');
+                return;
+            }
+
+            // Normalize keywords: split by comma, trim each, rejoin
+            const keyword = keywordRaw.split(/[,，]/)
+                .map(k => k.trim())
+                .filter(k => k)
+                .join(', ');
+
+            if (!keyword) {
+                showToast('请输入有效关键词', 'error');
                 return;
             }
 
