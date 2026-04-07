@@ -5,6 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
+from db import record_assignment, init_db
 
 # Try importing Windows-specific libraries safely
 try:
@@ -303,6 +304,8 @@ class OrderScanner:
         self.stop_event = threading.Event()
         self._weight_router = {}  # 存储每个关键词的轮询索引
         self.load_config()
+        # 初始化数据库
+        init_db()
 
     def load_config(self):
         candidates = ["config.local.json", "config.json"]
@@ -1049,10 +1052,12 @@ class OrderScanner:
                             # 将文本内容转为小写用于匹配
                             text_content_lower = text_content.lower()
 
+                            matched_kw_actual = None
                             for keyword_entry, mapping_obj in normalized_mapping.items():
                                 matched, matched_kw = _match_keyword(keyword_entry, text_content_lower)
                                 if matched:
                                     matched_keyword = keyword_entry
+                                    matched_kw_actual = matched_kw
                                     merchant_list = mapping_obj.get("merchants", [])
                                     target_option, round_info = self._get_merchant_by_weight(keyword_entry, merchant_list)
                                     matched_info = f"关键词匹配: {matched_kw} (规则: {keyword_entry}), {round_info}"
@@ -1165,6 +1170,19 @@ class OrderScanner:
                                         except Exception as e:
                                             log(f"点击确定按钮失败: {e}")
                                             raise e
+
+                                        # 记录分单
+                                        product = ""
+                                        if matched_keyword and matched_keyword in normalized_mapping:
+                                            product = normalized_mapping[matched_keyword].get("product", "")
+                                        record_assignment(
+                                            keyword_entry=matched_keyword,
+                                            matched_keyword=matched_kw_actual if matched_kw_actual else matched_keyword,
+                                            merchant=target_option,
+                                            product=product,
+                                            order_no=extra_fields.get("order_no", ""),
+                                            order_title=_mask_sensitive(text_content)
+                                        )
 
                                         # Send Notification
                                         self.send_notification(text_content, target_option)
