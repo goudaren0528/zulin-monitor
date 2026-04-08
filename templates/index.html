@@ -2370,7 +2370,15 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({merchant: merchant, webhook_urls: webhookUrls})
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        console.error('Server error:', text);
+                        throw new Error('服务器错误: ' + response.status);
+                    });
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.status === 'success') {
                     showToast(`已保存 ${merchant} Webhooks`, 'success');
@@ -2378,6 +2386,10 @@
                 } else {
                     showToast(data.message || '保存失败', 'error');
                 }
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                showToast('保存失败: ' + err.message, 'error');
             });
         }
 

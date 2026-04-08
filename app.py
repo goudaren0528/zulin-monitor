@@ -5,7 +5,7 @@ import threading
 import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks, init_db
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 config_lock = threading.Lock()
@@ -390,19 +390,24 @@ def handle_merchant_limits():
         return jsonify({'merchants': limits})
 
     elif request.method == 'POST':
-        data = request.json
-        merchant = data.get('merchant')
-        limit_value = data.get('limit_value')
-        webhook_urls = data.get('webhook_urls')
-        if not merchant:
-            return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
-        set_merchant_config(merchant=merchant, limit_value=limit_value, webhook_urls=webhook_urls)
-        msg_parts = []
-        if limit_value is not None:
-            msg_parts.append(f'限额为 {limit_value}')
-        if webhook_urls is not None:
-            msg_parts.append(f'webhook 已更新')
-        return jsonify({'status': 'success', 'message': f'已设置 {merchant}: ' + ', '.join(msg_parts)})
+        try:
+            data = request.json
+            merchant = data.get('merchant')
+            limit_value = data.get('limit_value')
+            webhook_urls = data.get('webhook_urls')
+            if not merchant:
+                return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
+            set_merchant_config(merchant=merchant, limit_value=limit_value, webhook_urls=webhook_urls)
+            msg_parts = []
+            if limit_value is not None:
+                msg_parts.append(f'限额为 {limit_value}')
+            if webhook_urls is not None:
+                msg_parts.append(f'webhook 已更新')
+            return jsonify({'status': 'success', 'message': f'已设置 {merchant}: ' + ', '.join(msg_parts)})
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/merchants/reset', methods=['POST'])
 def reset_merchant():
@@ -425,5 +430,7 @@ def reset_all_merchants():
     return jsonify({'status': 'success', 'message': f'已重置 {count} 个商户进度', 'reset_count': count})
 
 if __name__ == '__main__':
+    # Initialize database
+    init_db()
     # Listen on all interfaces for Docker
     app.run(host='0.0.0.0', port=5050, debug=True, use_reloader=False)
