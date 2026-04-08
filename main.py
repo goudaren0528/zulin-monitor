@@ -5,7 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
-from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhook
+from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks
 
 # Try importing Windows-specific libraries safely
 try:
@@ -430,9 +430,11 @@ class OrderScanner:
         # 固定处理链接
         MERCHANT_URL = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
 
-        # 1. 商户专属 Webhook 通知
-        merchant_webhook = get_merchant_webhook(merchant=assigned_to)
-        if merchant_webhook:
+        # 1. 商户专属 Webhook 通知（支持多个）
+        merchant_webhooks = get_merchant_webhooks(merchant=assigned_to)
+        for webhook_url in merchant_webhooks:
+            if not webhook_url:
+                continue
             try:
                 webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{MERCHANT_URL}"
                 payload = {
@@ -441,8 +443,8 @@ class OrderScanner:
                         "content": webhook_content
                     }
                 }
-                resp = requests.post(merchant_webhook, json=payload)
-                log(f"-> 商户专属 Webhook 已发送至 [{merchant_webhook[-20:]}...]，状态码: {resp.status_code}")
+                resp = requests.post(webhook_url, json=payload)
+                log(f"-> 商户专属 Webhook 已发送至 [{webhook_url[-20:]}...]，状态码: {resp.status_code}")
             except Exception as e:
                 log(f"-> 商户专属 Webhook 发送失败: {e}")
 

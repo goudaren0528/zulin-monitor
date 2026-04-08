@@ -907,6 +907,30 @@
             color: var(--color-muted);
             margin-right: 4px;
         }
+        .webhook-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--color-border);
+        }
+        .webhook-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .webhook-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .webhook-item {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .webhook-item .webhook-input {
+            flex: 1;
+        }
     </style>
 </head>
 <body>
@@ -2268,9 +2292,19 @@
             container.innerHTML = merchants.map(m => {
                 const limitValue = m.limit_value || 0;
                 const currentCount = m.current_count || 0;
-                const webhookUrl = m.webhook_url || '';
+                const webhookUrls = m.webhook_urls || [];
                 const isAtLimit = limitValue > 0 && currentCount >= limitValue;
                 const progressPct = limitValue > 0 ? Math.min(100, (currentCount / limitValue) * 100) : 0;
+
+                const webhookItems = webhookUrls.length > 0
+                    ? webhookUrls.map((url, idx) => `
+                        <div class="webhook-item">
+                            <input type="text" class="webhook-input" value="${url}"
+                                   data-merchant="${m.merchant}" data-idx="${idx}" placeholder="企业微信机器人地址">
+                            <button class="btn btn-sm btn-outline-danger" onclick="removeMerchantWebhook('${m.merchant}', ${idx})">删除</button>
+                        </div>
+                    `).join('')
+                    : '<div class="text-muted small">暂无配置</div>';
 
                 return `
                     <div class="merchant-limit-card ${isAtLimit ? 'at-limit' : ''}">
@@ -2297,15 +2331,54 @@
                             <button class="btn btn-sm btn-outline-primary" onclick="saveMerchantLimit('${m.merchant}')">保存限额</button>
                             <button class="btn btn-sm btn-outline-warning" onclick="resetMerchantLimit('${m.merchant}')">重置</button>
                         </div>
-                        <div class="merchant-limit-controls">
-                            <span class="webhook-label">Webhook:</span>
-                            <input type="text" class="webhook-input" value="${webhookUrl}"
-                                   data-merchant="${m.merchant}" data-field="webhook" placeholder="企业微信机器人地址">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="saveMerchantWebhook('${m.merchant}')">保存</button>
+                        <div class="webhook-section">
+                            <div class="webhook-header">
+                                <span class="webhook-label">Webhooks (${webhookUrls.length})</span>
+                                <button class="btn btn-sm btn-outline-success" onclick="addMerchantWebhook('${m.merchant}')">+ 添加</button>
+                            </div>
+                            <div class="webhook-list" data-merchant="${m.merchant}">
+                                ${webhookItems}
+                            </div>
                         </div>
                     </div>
                 `;
             }).join('');
+        }
+
+        function addMerchantWebhook(merchant) {
+            const inputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
+            const currentUrls = Array.from(inputs).map(input => input.value.trim()).filter(url => url);
+
+            // 添加一个空项
+            currentUrls.push('');
+            saveMerchantWebhooks(merchant, currentUrls);
+        }
+
+        function removeMerchantWebhook(merchant, idx) {
+            const inputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
+            const currentUrls = Array.from(inputs).map(input => input.value.trim()).filter(url => url);
+
+            if (idx < currentUrls.length) {
+                currentUrls.splice(idx, 1);
+            }
+            saveMerchantWebhooks(merchant, currentUrls);
+        }
+
+        function saveMerchantWebhooks(merchant, webhookUrls) {
+            fetch('/api/merchants/limits', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({merchant: merchant, webhook_urls: webhookUrls})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已保存 ${merchant} Webhooks`, 'success');
+                    loadMerchantLimits();
+                } else {
+                    showToast(data.message || '保存失败', 'error');
+                }
+            });
         }
 
         function saveMerchantLimit(merchant) {
@@ -2321,26 +2394,6 @@
             .then(data => {
                 if (data.status === 'success') {
                     showToast(`已保存 ${merchant} 限额`, 'success');
-                    loadMerchantLimits();
-                } else {
-                    showToast(data.message || '保存失败', 'error');
-                }
-            });
-        }
-
-        function saveMerchantWebhook(merchant) {
-            const input = document.querySelector(`input[data-merchant="${merchant}"][data-field="webhook"]`);
-            const webhookUrl = input.value.trim();
-
-            fetch('/api/merchants/limits', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({merchant: merchant, webhook_url: webhookUrl})
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    showToast(`已保存 ${merchant} Webhook`, 'success');
                     loadMerchantLimits();
                 } else {
                     showToast(data.message || '保存失败', 'error');

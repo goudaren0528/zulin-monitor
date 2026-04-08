@@ -5,7 +5,7 @@ import threading
 import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhook
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 config_lock = threading.Lock()
@@ -381,7 +381,7 @@ def handle_merchant_limits():
                 limits.append({
                     'merchant': m,
                     'limit_value': 0,
-                    'webhook_url': '',
+                    'webhook_urls': [],
                     'current_count': 0,
                     'last_reset_at': '',
                     'is_at_limit': False
@@ -393,14 +393,14 @@ def handle_merchant_limits():
         data = request.json
         merchant = data.get('merchant')
         limit_value = data.get('limit_value')
-        webhook_url = data.get('webhook_url')
+        webhook_urls = data.get('webhook_urls')
         if not merchant:
             return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
-        set_merchant_config(merchant=merchant, limit_value=limit_value, webhook_url=webhook_url)
+        set_merchant_config(merchant=merchant, limit_value=limit_value, webhook_urls=webhook_urls)
         msg_parts = []
         if limit_value is not None:
             msg_parts.append(f'限额为 {limit_value}')
-        if webhook_url is not None:
+        if webhook_urls is not None:
             msg_parts.append(f'webhook 已更新')
         return jsonify({'status': 'success', 'message': f'已设置 {merchant}: ' + ', '.join(msg_parts)})
 
