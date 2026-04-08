@@ -2,6 +2,7 @@
 import sqlite3
 import threading
 import os
+import json
 from datetime import datetime
 
 # 线程锁防止并发冲突
