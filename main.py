@@ -5,7 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
-from db import record_assignment, init_db, get_merchants_at_limit
+from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhook
 
 # Try importing Windows-specific libraries safely
 try:
@@ -428,22 +428,44 @@ class OrderScanner:
         webhook_configs = self.get_config("webhook_configs", [])
         rpa_group_mapping = self.get_config("rpa_group_mapping", {})
 
-        # 1. Webhook Notification
+        # 1. 商户专属 Webhook 通知（优先）
+        merchant_webhook = get_merchant_webhook(merchant=assigned_to)
+        if merchant_webhook:
+            try:
+                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
+                if assigned_to == "米奇租赁官方":
+                    webhook_content += f"\n处理链接：{merchant_url}"
+                payload = {
+                    "msgtype": "text",
+                    "text": {
+                        "content": webhook_content
+                    }
+                }
+                resp = requests.post(merchant_webhook, json=payload)
+                log(f"-> 商户专属 Webhook 已发送至 [{merchant_webhook[-20:]}...]，状态码: {resp.status_code}")
+            except Exception as e:
+                log(f"-> 商户专属 Webhook 发送失败: {e}")
+
+        # 2. 全局 Webhook 配置通知
         if webhook_configs:
             for config in webhook_configs:
                 webhook_url = config.get("url")
                 targets = config.get("targets", [])
-                
+
                 if not webhook_url:
                     continue
-                    
+
+                # 如果商户有专属 webhook，跳过针对该商户的全局配置
+                if merchant_webhook and assigned_to in targets:
+                    continue
+
                 if "*" in targets or not targets or assigned_to in targets:
                     try:
                         if assigned_to == "米奇租赁官方":
                             webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
                         else:
                             webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
-                            
+
                         payload = {
                             "msgtype": "text",
                             "text": {
@@ -451,7 +473,7 @@ class OrderScanner:
                             }
                         }
                         resp = requests.post(webhook_url, json=payload)
-                        log(f"-> Webhook 通知已发送至 [{webhook_url[-6:]}...]，状态码: {resp.status_code}")
+                        log(f"-> Webhook 通知已发送至 [{webhook_url[-20:]}...]，状态码: {resp.status_code}")
                     except Exception as e:
                         log(f"-> Webhook 发送失败: {e}")
 

@@ -34,7 +34,7 @@ def init_db(db_path=None):
         conn.commit()
         conn.close()
 
-    init_merchant_limits_table(db_path)
+    init_merchant_config_table(db_path)
 
 def record_assignment(db_path=None, keyword_entry=None, matched_keyword=None,
                       merchant=None, product=None, order_no=None, order_title=None):
@@ -104,27 +104,50 @@ def get_merchant_totals(db_path=None):
         conn.close()
         return results
 
-def init_merchant_limits_table(db_path=None):
-    """创建商户限额表"""
+def init_merchant_config_table(db_path=None):
+    """创建商户配置表（限额+webhook）"""
     if db_path is None:
         db_path = DB_PATH
 
     with db_lock:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS merchant_limits (
-                merchant TEXT PRIMARY KEY NOT NULL,
-                limit_value INTEGER DEFAULT 0,
-                last_reset_at TEXT NOT NULL,
-                updated_at TEXT
-            )
-        """)
+        # 如果旧表存在，迁移数据到新表
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='merchant_limits'")
+        if cursor.fetchone():
+            # 创建新表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS merchant_config (
+                    merchant TEXT PRIMARY KEY NOT NULL,
+                    limit_value INTEGER DEFAULT 0,
+                    webhook_url TEXT,
+                    last_reset_at TEXT NOT NULL,
+                    updated_at TEXT
+                )
+            """)
+            # 迁移数据
+            cursor.execute("""
+                INSERT OR IGNORE INTO merchant_config (merchant, limit_value, last_reset_at, updated_at)
+                SELECT merchant, limit_value, last_reset_at, updated_at FROM merchant_limits
+            """)
+            # 删除旧表
+            cursor.execute("DROP TABLE merchant_limits")
+        else:
+            # 直接创建新表
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS merchant_config (
+                    merchant TEXT PRIMARY KEY NOT NULL,
+                    limit_value INTEGER DEFAULT 0,
+                    webhook_url TEXT,
+                    last_reset_at TEXT NOT NULL,
+                    updated_at TEXT
+                )
+            """)
         conn.commit()
         conn.close()
 
-def get_merchant_limit(db_path=None, merchant=None):
-    """获取单个商户的限额配置"""
+def get_merchant_config(db_path=None, merchant=None):
+    """获取单个商户的配置"""
     if db_path is None:
         db_path = DB_PATH
 
@@ -134,15 +157,15 @@ def get_merchant_limit(db_path=None, merchant=None):
     with db_lock:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT merchant, limit_value, last_reset_at FROM merchant_limits WHERE merchant=?", (merchant,))
+        cursor.execute("SELECT merchant, limit_value, webhook_url, last_reset_at FROM merchant_config WHERE merchant=?", (merchant,))
         row = cursor.fetchone()
         conn.close()
         if row:
-            return {"merchant": row[0], "limit_value": row[1], "last_reset_at": row[2]}
+            return {"merchant": row[0], "limit_value": row[1], "webhook_url": row[2], "last_reset_at": row[3]}
         return None
 
-def set_merchant_limit(db_path=None, merchant=None, limit_value=0):
-    """设置商户限额"""
+def set_merchant_config(db_path=None, merchant=None, limit_value=None, webhook_url=None):
+    """设置商户配置（限额或webhook，可单独更新）"""
     if db_path is None:
         db_path = DB_PATH
 
@@ -155,17 +178,25 @@ def set_merchant_limit(db_path=None, merchant=None, limit_value=0):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         # 检查是否存在
-        cursor.execute("SELECT merchant FROM merchant_limits WHERE merchant=?", (merchant,))
-        if cursor.fetchone():
-            cursor.execute("UPDATE merchant_limits SET limit_value=?, updated_at=? WHERE merchant=?",
-                          (limit_value, now, merchant))
+        cursor.execute("SELECT merchant, limit_value, webhook_url FROM merchant_config WHERE merchant=?", (merchant,))
+        existing = cursor.fetchone()
+        if existing:
+            # 保留未更新的字段
+            if limit_value is None:
+                limit_value = existing[1]
+            if webhook_url is None:
+                webhook_url = existing[2]
+            cursor.execute("UPDATE merchant_config SET limit_value=?, webhook_url=?, updated_at=? WHERE merchant=?",
+                          (limit_value, webhook_url, now, merchant))
         else:
-            cursor.execute("INSERT INTO merchant_limits (merchant, limit_value, last_reset_at, updated_at) VALUES (?, ?, ?, ?)",
-                          (merchant, limit_value, now, now))
+            if limit_value is None:
+                limit_value = 0
+            cursor.execute("INSERT INTO merchant_config (merchant, limit_value, webhook_url, last_reset_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                          (merchant, limit_value, webhook_url, now, now))
         conn.commit()
         conn.close()
 
-def reset_merchant_limit(db_path=None, merchant=None):
+def reset_merchant_progress(db_path=None, merchant=None):
     """重置商户进度"""
     if db_path is None:
         db_path = DB_PATH
@@ -175,9 +206,16 @@ def reset_merchant_limit(db_path=None, merchant=None):
     with db_lock:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("UPDATE merchant_limits SET last_reset_at=? WHERE merchant=?", (now, merchant))
+        cursor.execute("UPDATE merchant_config SET last_reset_at=? WHERE merchant=?", (now, merchant))
         conn.commit()
         conn.close()
+
+def get_merchant_webhook(db_path=None, merchant=None):
+    """获取商户的 webhook 地址"""
+    config = get_merchant_config(db_path, merchant)
+    if config:
+        return config.get("webhook_url")
+    return None
 
 def get_merchant_count_since(db_path=None, merchant=None, since_timestamp=None):
     """获取商户自指定时间以来的分单数量"""
@@ -199,8 +237,8 @@ def get_merchant_count_since(db_path=None, merchant=None, since_timestamp=None):
         conn.close()
         return count
 
-def get_all_merchant_limits(db_path=None):
-    """获取所有商户限额及当前进度"""
+def get_all_merchant_configs(db_path=None):
+    """获取所有商户配置及当前进度"""
     if db_path is None:
         db_path = DB_PATH
 
@@ -210,17 +248,18 @@ def get_all_merchant_limits(db_path=None):
     with db_lock:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        cursor.execute("SELECT merchant, limit_value, last_reset_at FROM merchant_limits")
+        cursor.execute("SELECT merchant, limit_value, webhook_url, last_reset_at FROM merchant_config")
         rows = cursor.fetchall()
         conn.close()
 
     results = []
     for row in rows:
-        merchant, limit_value, last_reset_at = row
+        merchant, limit_value, webhook_url, last_reset_at = row
         current_count = get_merchant_count_since(db_path, merchant, last_reset_at)
         results.append({
             "merchant": merchant,
             "limit_value": limit_value,
+            "webhook_url": webhook_url or "",
             "current_count": current_count,
             "last_reset_at": last_reset_at,
             "is_at_limit": limit_value > 0 and current_count >= limit_value
@@ -229,5 +268,21 @@ def get_all_merchant_limits(db_path=None):
 
 def get_merchants_at_limit(db_path=None):
     """获取已达到限额的商户列表"""
-    limits = get_all_merchant_limits(db_path)
-    return [m["merchant"] for m in limits if m["is_at_limit"]]
+    configs = get_all_merchant_configs(db_path)
+    return [m["merchant"] for m in configs if m["is_at_limit"]]
+
+# 保留旧函数名兼容性
+def init_merchant_limits_table(db_path=None):
+    init_merchant_config_table(db_path)
+
+def get_merchant_limit(db_path=None, merchant=None):
+    return get_merchant_config(db_path, merchant)
+
+def set_merchant_limit(db_path=None, merchant=None, limit_value=0):
+    set_merchant_config(db_path, merchant, limit_value=limit_value)
+
+def reset_merchant_limit(db_path=None, merchant=None):
+    reset_merchant_progress(db_path, merchant)
+
+def get_all_merchant_limits(db_path=None):
+    return get_all_merchant_configs(db_path)
