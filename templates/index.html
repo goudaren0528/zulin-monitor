@@ -2310,9 +2310,14 @@
                     <div class="merchant-limit-card ${isAtLimit ? 'at-limit' : ''}">
                         <div class="merchant-limit-header">
                             <span class="merchant-name">${m.merchant}</span>
-                            <span class="merchant-status ${isAtLimit ? 'at-limit' : ''}">
-                                ${isAtLimit ? '已满' : (limitValue > 0 ? '正常' : '无限制')}
-                            </span>
+                            <div>
+                                <span class="merchant-status ${isAtLimit ? 'at-limit' : ''}">
+                                    ${isAtLimit ? '已满' : (limitValue > 0 ? '正常' : '无限制')}
+                                </span>
+                                <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteMerchant('${m.merchant}')" title="删除商户">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                            </div>
                         </div>
                         <div class="merchant-limit-progress">
                             <div class="progress-text">
@@ -2488,8 +2493,34 @@
         }
 
         // Initialize merchant limits on accordion show
-        document.querySelector('[data-bs-target="#collapseMerchantLimits"]')
-            .addEventListener('shown.bs.collapse', loadMerchantLimits);
+        document.addEventListener('DOMContentLoaded', function() {
+            const accordionBtn = document.querySelector('[data-bs-target="#collapseMerchantLimits"]');
+            if (accordionBtn) {
+                accordionBtn.addEventListener('shown.bs.collapse', loadMerchantLimits);
+            }
+        });
+
+        function deleteMerchant(merchant) {
+            if (!confirm(`确认删除商户「${merchant}」的所有配置？\n\n此操作将删除该商户的限额设置和所有 webhook 配置。`)) return;
+
+            fetch('/api/merchants/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({merchant: merchant})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已删除商户 ${merchant}`, 'success');
+                    loadMerchantLimits();
+                } else {
+                    showToast(data.message || '删除失败', 'error');
+                }
+            })
+            .catch(err => {
+                showToast('删除失败: ' + err.message, 'error');
+            });
+        }
     </script>
 </body>
 </html>

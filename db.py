@@ -324,6 +324,23 @@ def get_merchants_at_limit(db_path=None):
     configs = get_all_merchant_configs(db_path)
     return [m["merchant"] for m in configs if m["is_at_limit"]]
 
+def delete_merchant_config(db_path=None, merchant=None):
+    """删除商户配置"""
+    if db_path is None:
+        db_path = DB_PATH
+
+    if not os.path.exists(db_path):
+        return False
+
+    with db_lock:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM merchant_config WHERE merchant=?", (merchant,))
+        conn.commit()
+        deleted = cursor.rowcount > 0
+        conn.close()
+    return deleted
+
 # 保留旧函数名兼容性
 def init_merchant_limits_table(db_path=None):
     init_merchant_config_table(db_path)

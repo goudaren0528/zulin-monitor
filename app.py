@@ -5,7 +5,7 @@ import threading
 import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks, init_db
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks, init_db, delete_merchant_config
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 config_lock = threading.Lock()
@@ -428,6 +428,20 @@ def reset_all_merchants():
         reset_merchant_limit(merchant=m['merchant'])
         count += 1
     return jsonify({'status': 'success', 'message': f'已重置 {count} 个商户进度', 'reset_count': count})
+
+@app.route('/api/merchants/delete', methods=['POST'])
+def delete_merchant():
+    """删除商户配置"""
+    data = request.json
+    merchant = data.get('merchant')
+    if not merchant:
+        return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
+
+    deleted = delete_merchant_config(merchant=merchant)
+    if deleted:
+        return jsonify({'status': 'success', 'message': f'已删除商户 {merchant}'})
+    else:
+        return jsonify({'status': 'error', 'message': '商户不存在或删除失败'}), 404
 
 if __name__ == '__main__':
     # Initialize database
