@@ -432,6 +432,7 @@ class OrderScanner:
 
         # 1. 商户专属 Webhook 通知（支持多个）
         merchant_webhooks = get_merchant_webhooks(merchant=assigned_to)
+        log(f"-> [调试] 商户 {assigned_to} 专属 webhooks: {merchant_webhooks}")
         for webhook_url in merchant_webhooks:
             if not webhook_url:
                 continue
