@@ -2346,21 +2346,65 @@
         }
 
         function addMerchantWebhook(merchant) {
-            const inputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
-            const currentUrls = Array.from(inputs).map(input => input.value.trim()).filter(url => url);
+            // 直接在DOM中添加一个新的输入框，不立即保存
+            const listContainer = document.querySelector(`.webhook-list[data-merchant="${merchant}"]`);
 
-            // 添加一个空项
-            currentUrls.push('');
+            // 移除"暂无配置"提示
+            const emptyHint = listContainer.querySelector('.text-muted');
+            if (emptyHint) {
+                emptyHint.remove();
+            }
+
+            // 计算当前索引
+            const existingInputs = listContainer.querySelectorAll('input[data-idx]');
+            const newIdx = existingInputs.length;
+
+            // 创建新的webhook项
+            const newItem = document.createElement('div');
+            newItem.className = 'webhook-item';
+            newItem.innerHTML = `
+                <input type="text" class="webhook-input" value=""
+                       data-merchant="${merchant}" data-idx="${newIdx}" placeholder="输入企业微信机器人地址">
+                <button class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">取消</button>
+                <button class="btn btn-sm btn-outline-primary" onclick="confirmAddWebhook('${merchant}', ${newIdx})">确认</button>
+            `;
+            listContainer.appendChild(newItem);
+
+            // 聚焦到新输入框
+            newItem.querySelector('input').focus();
+        }
+
+        function confirmAddWebhook(merchant, idx) {
+            const input = document.querySelector(`input[data-merchant="${merchant}"][data-idx="${idx}"]`);
+            const newUrl = input.value.trim();
+
+            if (!newUrl) {
+                showToast('请输入 webhook 地址', 'error');
+                return;
+            }
+
+            // 获取所有现有的webhook
+            const allInputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
+            const currentUrls = [];
+            allInputs.forEach(inp => {
+                const val = inp.value.trim();
+                if (val) currentUrls.push(val);
+            });
+
             saveMerchantWebhooks(merchant, currentUrls);
         }
 
         function removeMerchantWebhook(merchant, idx) {
-            const inputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
-            const currentUrls = Array.from(inputs).map(input => input.value.trim()).filter(url => url);
+            if (!confirm('确认删除此 webhook？')) return;
 
-            if (idx < currentUrls.length) {
-                currentUrls.splice(idx, 1);
-            }
+            const inputs = document.querySelectorAll(`input[data-merchant="${merchant}"][data-idx]`);
+            const currentUrls = [];
+            inputs.forEach((input, i) => {
+                if (i !== idx) {
+                    const val = input.value.trim();
+                    if (val) currentUrls.push(val);
+                }
+            });
             saveMerchantWebhooks(merchant, currentUrls);
         }
 
