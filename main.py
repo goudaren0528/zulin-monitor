@@ -424,17 +424,17 @@ class OrderScanner:
         self.start()
 
     def send_notification(self, order_title, assigned_to):
-        merchant_url = self.get_config("merchant_url", "")
         webhook_configs = self.get_config("webhook_configs", [])
         rpa_group_mapping = self.get_config("rpa_group_mapping", {})
 
-        # 1. 商户专属 Webhook 通知（优先）
+        # 固定处理链接
+        MERCHANT_URL = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
+
+        # 1. 商户专属 Webhook 通知
         merchant_webhook = get_merchant_webhook(merchant=assigned_to)
         if merchant_webhook:
             try:
-                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
-                if assigned_to == "米奇租赁官方":
-                    webhook_content += f"\n处理链接：{merchant_url}"
+                webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{MERCHANT_URL}"
                 payload = {
                     "msgtype": "text",
                     "text": {
@@ -446,7 +446,7 @@ class OrderScanner:
             except Exception as e:
                 log(f"-> 商户专属 Webhook 发送失败: {e}")
 
-        # 2. 全局 Webhook 配置通知
+        # 2. 全局 Webhook 配置通知（同时发送）
         if webhook_configs:
             for config in webhook_configs:
                 webhook_url = config.get("url")
@@ -455,17 +455,9 @@ class OrderScanner:
                 if not webhook_url:
                     continue
 
-                # 如果商户有专属 webhook，跳过针对该商户的全局配置
-                if merchant_webhook and assigned_to in targets:
-                    continue
-
                 if "*" in targets or not targets or assigned_to in targets:
                     try:
-                        if assigned_to == "米奇租赁官方":
-                            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{merchant_url}"
-                        else:
-                            webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}"
-
+                        webhook_content = f"新订单已分配\n标题：{order_title}\n分配给：{assigned_to}\n处理链接：{MERCHANT_URL}"
                         payload = {
                             "msgtype": "text",
                             "text": {
@@ -477,7 +469,7 @@ class OrderScanner:
                     except Exception as e:
                         log(f"-> Webhook 发送失败: {e}")
 
-        # 2. RPA Notification (Windows only)
+        # 3. RPA Notification (Windows only)
         target_group = rpa_group_mapping.get(assigned_to)
         if target_group:
             if sys.platform == 'win32' and HAS_UIAUTOMATION:
@@ -492,11 +484,11 @@ class OrderScanner:
             return
 
         try:
-            merchant_url = self.get_config("merchant_url", "")
+            MERCHANT_URL = "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1"
             if assigned_to == "星享生活":
-                content = f"老板，有新订单需要处理哈~ 辛苦处理下：\n{order_title}\n\n处理链接：{merchant_url}"
+                content = f"老板，有新订单需要处理哈~ 辛苦处理下：\n{order_title}\n\n处理链接：{MERCHANT_URL}"
             else:
-                content = f"您好，有新订单分配给您，请及时处理：\n{order_title}\n\n处理链接：{merchant_url}"
+                content = f"您好，有新订单分配给您，请及时处理：\n{order_title}\n\n处理链接：{MERCHANT_URL}"
                 
             wechat_window = auto.WindowControl(searchDepth=1, Name="企业微信")
             if not wechat_window.Exists(0):
