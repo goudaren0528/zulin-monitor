@@ -742,6 +742,90 @@ def import_data():
         except:
             pass
 
+@app.route('/api/data/backups', methods=['GET'])
+def list_backups():
+    """获取备份列表"""
+    _ensure_backup_dir()
+    backups = []
+    if os.path.exists(BACKUP_DIR):
+        for filename in sorted(os.listdir(BACKUP_DIR), reverse=True):
+            if filename.startswith("backup-") and filename.endswith(".zip"):
+                filepath = os.path.join(BACKUP_DIR, filename)
+                stat = os.stat(filepath)
+                # 从文件名解析时间
+                try:
+                    time_str = filename.replace("backup-", "").replace(".zip", "")
+                    created_at = datetime.strptime(time_str, "%Y%m%d-%H%M%S").strftime("%Y-%m-%d %H:%M:%S")
+                except:
+                    created_at = ""
+                backups.append({
+                    "filename": filename,
+                    "created_at": created_at,
+                    "size": stat.st_size
+                })
+    return jsonify({"backups": backups})
+
+@app.route('/api/data/backup/<filename>', methods=['GET'])
+def download_backup(filename):
+    """下载指定备份"""
+    filepath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
+    from flask import send_file
+    return send_file(filepath, mimetype='application/zip', as_attachment=True, download_name=filename)
+
+@app.route('/api/data/backup/<filename>', methods=['POST'])
+def restore_backup(filename):
+    """恢复指定备份"""
+    filepath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
+
+    try:
+        # 创建新的备份（当前状态）
+        new_backup = _create_backup()
+
+        # 解压备份
+        with zipfile.ZipFile(filepath, 'r') as zf:
+            filenames = zf.namelist()
+            temp_dir = tempfile.mkdtemp()
+            try:
+                zf.extractall(temp_dir)
+
+                if "config.json" in filenames:
+                    shutil.copy(os.path.join(temp_dir, "config.json"), "config.local.json")
+                if "records.db" in filenames:
+                    with db_lock:
+                        shutil.copy(os.path.join(temp_dir, "records.db"), DB_PATH)
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+
+        # 重载配置
+        scanner.load_config()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'已恢复备份 {filename}',
+            'new_backup': new_backup
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/data/backup/<filename>', methods=['DELETE'])
+def delete_backup(filename):
+    """删除指定备份"""
+    filepath = os.path.join(BACKUP_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
+
+    try:
+        os.remove(filepath)
+        return jsonify({'status': 'success', 'message': f'已删除备份 {filename}'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/data/export', methods=['GET'])
 def export_data():
     """导出数据为ZIP文件"""
