@@ -579,64 +579,60 @@ def add_merchant():
 BACKUP_DIR = "backups"
 MAX_BACKUPS = 10
 
-def _get_config_file_path():
-    """获取优先使用的配置文件路径"""
-    if os.path.exists("config.local.json"):
-        return "config.local.json"
-    if os.path.exists("config.json"):
-        return "config.json"
-    return None
-
 def _create_export_zip():
     """创建导出ZIP文件，返回临时文件路径"""
     temp_dir = tempfile.mkdtemp()
     export_files = []
 
-    # 1. 配置文件
-    config_path = _get_config_file_path()
-    if config_path:
-        shutil.copy(config_path, os.path.join(temp_dir, "config.json"))
-        export_files.append("config.json")
+    try:
+        # 1. 配置文件
+        config_path = _get_config_path()
+        if os.path.exists(config_path):
+            shutil.copy(config_path, os.path.join(temp_dir, "config.json"))
+            export_files.append("config.json")
 
-    # 2. 数据库文件
-    if os.path.exists(DB_PATH):
-        shutil.copy(DB_PATH, os.path.join(temp_dir, "records.db"))
-        export_files.append("records.db")
+        # 2. 数据库文件
+        if os.path.exists(DB_PATH):
+            shutil.copy(DB_PATH, os.path.join(temp_dir, "records.db"))
+            export_files.append("records.db")
 
-    # 3. 导出元数据
-    export_info = {
-        "export_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "version": "1.0",
-        "source": "order-point",
-        "config_file": config_path,
-        "files": export_files
-    }
-    if os.path.exists(DB_PATH):
-        with db_lock:
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM assignment_records")
-            export_info["assignment_records_count"] = cursor.fetchone()[0]
-            cursor.execute("SELECT COUNT(*) FROM merchant_config")
-            export_info["merchant_config_count"] = cursor.fetchone()[0]
-            conn.close()
+        # 3. 导出元数据
+        export_info = {
+            "export_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "version": "1.0",
+            "source": "order-point",
+            "config_file": config_path if os.path.exists(config_path) else None,
+            "files": export_files
+        }
+        if os.path.exists(DB_PATH):
+            with db_lock:
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM assignment_records")
+                export_info["assignment_records_count"] = cursor.fetchone()[0]
+                cursor.execute("SELECT COUNT(*) FROM merchant_config")
+                export_info["merchant_config_count"] = cursor.fetchone()[0]
+                conn.close()
 
-    with open(os.path.join(temp_dir, "export_info.json"), 'w', encoding='utf-8') as f:
-        json.dump(export_info, f, indent=2, ensure_ascii=False)
+        with open(os.path.join(temp_dir, "export_info.json"), 'w', encoding='utf-8') as f:
+            json.dump(export_info, f, indent=2, ensure_ascii=False)
 
-    # 创建ZIP文件
-    zip_filename = f"order-point-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
-    zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
+        # 创建ZIP文件
+        zip_filename = f"order-point-export-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+        zip_path = os.path.join(tempfile.gettempdir(), zip_filename)
 
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for filename in os.listdir(temp_dir):
-            file_path = os.path.join(temp_dir, filename)
-            zf.write(file_path, filename)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+            for filename in os.listdir(temp_dir):
+                file_path = os.path.join(temp_dir, filename)
+                zf.write(file_path, filename)
 
-    # 清理临时目录
-    shutil.rmtree(temp_dir)
-
-    return zip_path, zip_filename
+        return zip_path, zip_filename
+    finally:
+        # Always cleanup temp directory
+        try:
+            shutil.rmtree(temp_dir)
+        except:
+            pass
 
 @app.route('/api/data/export', methods=['GET'])
 def export_data():
