@@ -634,6 +634,111 @@ def _create_export_zip():
         except:
             pass
 
+def _ensure_backup_dir():
+    """确保备份目录存在"""
+    if not os.path.exists(BACKUP_DIR):
+        os.makedirs(BACKUP_DIR)
+
+def _create_backup():
+    """创建当前数据备份"""
+    _ensure_backup_dir()
+    backup_filename = f"backup-{datetime.now().strftime('%Y%m%d-%H%M%S')}.zip"
+    backup_path = os.path.join(BACKUP_DIR, backup_filename)
+
+    with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        config_path = _get_config_path()
+        if config_path and os.path.exists(config_path):
+            zf.write(config_path, "config.json")
+        if os.path.exists(DB_PATH):
+            zf.write(DB_PATH, "records.db")
+
+    # 清理旧备份
+    _cleanup_old_backups()
+
+    return backup_filename
+
+def _cleanup_old_backups():
+    """清理超过限制的旧备份"""
+    if not os.path.exists(BACKUP_DIR):
+        return
+    backups = sorted(
+        [f for f in os.listdir(BACKUP_DIR) if f.startswith("backup-") and f.endswith(".zip")],
+        reverse=True
+    )
+    for old_backup in backups[MAX_BACKUPS:]:
+        try:
+            os.remove(os.path.join(BACKUP_DIR, old_backup))
+        except:
+            pass
+
+def _validate_import_zip(zip_path):
+    """验证导入ZIP文件结构"""
+    with zipfile.ZipFile(zip_path, 'r') as zf:
+        filenames = zf.namelist()
+        has_config = "config.json" in filenames
+        has_db = "records.db" in filenames
+        return has_config or has_db, filenames
+
+@app.route('/api/data/import', methods=['POST'])
+def import_data():
+    """导入ZIP数据文件"""
+    if 'file' not in request.files:
+        return jsonify({'status': 'error', 'message': '未上传文件'}), 400
+
+    file = request.files['file']
+    if not file.filename.endswith('.zip'):
+        return jsonify({'status': 'error', 'message': '仅支持ZIP文件'}), 400
+
+    try:
+        # 保存上传文件到临时目录
+        temp_zip = tempfile.mktemp(suffix='.zip')
+        file.save(temp_zip)
+
+        # 验证ZIP结构
+        valid, filenames = _validate_import_zip(temp_zip)
+        if not valid:
+            os.remove(temp_zip)
+            return jsonify({'status': 'error', 'message': 'ZIP文件缺少必需数据（config.json或records.db）'}), 400
+
+        # 创建备份
+        backup_filename = _create_backup()
+
+        # 解压并替换
+        with zipfile.ZipFile(temp_zip, 'r') as zf:
+            if "config.json" in filenames:
+                # 提取到临时目录再复制
+                temp_dir = tempfile.mkdtemp()
+                try:
+                    zf.extract("config.json", temp_dir)
+                    shutil.copy(os.path.join(temp_dir, "config.json"), "config.local.json")
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+
+            if "records.db" in filenames:
+                # 关闭可能的数据库连接
+                temp_dir = tempfile.mkdtemp()
+                try:
+                    zf.extract("records.db", temp_dir)
+                    shutil.copy(os.path.join(temp_dir, "records.db"), DB_PATH)
+                finally:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+
+        # 清理临时ZIP
+        os.remove(temp_zip)
+
+        # 重载配置
+        scanner.load_config()
+
+        return jsonify({
+            'status': 'success',
+            'message': '数据导入成功，配置已重载',
+            'backup_file': backup_filename
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/data/export', methods=['GET'])
 def export_data():
     """导出数据为ZIP文件"""
