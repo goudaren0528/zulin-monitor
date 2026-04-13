@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_file
 import os
 import json
 import threading
@@ -742,6 +742,18 @@ def import_data():
         except:
             pass
 
+def _validate_backup_filename(filename):
+    """验证备份文件名格式，防止路径遍历攻击"""
+    # 必须是 backup-YYYYMMDD-HHMMSS.zip 格式
+    if not filename.startswith("backup-"):
+        return False
+    if not filename.endswith(".zip"):
+        return False
+    # 不能包含路径分隔符
+    if "/" in filename or "\\" in filename:
+        return False
+    return True
+
 @app.route('/api/data/backups', methods=['GET'])
 def list_backups():
     """获取备份列表"""
@@ -768,15 +780,18 @@ def list_backups():
 @app.route('/api/data/backup/<filename>', methods=['GET'])
 def download_backup(filename):
     """下载指定备份"""
+    if not _validate_backup_filename(filename):
+        return jsonify({'status': 'error', 'message': '无效的备份文件名'}), 400
     filepath = os.path.join(BACKUP_DIR, filename)
     if not os.path.exists(filepath):
         return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
-    from flask import send_file
     return send_file(filepath, mimetype='application/zip', as_attachment=True, download_name=filename)
 
 @app.route('/api/data/backup/<filename>', methods=['POST'])
 def restore_backup(filename):
     """恢复指定备份"""
+    if not _validate_backup_filename(filename):
+        return jsonify({'status': 'error', 'message': '无效的备份文件名'}), 400
     filepath = os.path.join(BACKUP_DIR, filename)
     if not os.path.exists(filepath):
         return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
@@ -816,6 +831,8 @@ def restore_backup(filename):
 @app.route('/api/data/backup/<filename>', methods=['DELETE'])
 def delete_backup(filename):
     """删除指定备份"""
+    if not _validate_backup_filename(filename):
+        return jsonify({'status': 'error', 'message': '无效的备份文件名'}), 400
     filepath = os.path.join(BACKUP_DIR, filename)
     if not os.path.exists(filepath):
         return jsonify({'status': 'error', 'message': '备份文件不存在'}), 404
@@ -831,7 +848,6 @@ def export_data():
     """导出数据为ZIP文件"""
     try:
         zip_path, zip_filename = _create_export_zip()
-        from flask import send_file
         response = send_file(
             zip_path,
             mimetype='application/zip',
