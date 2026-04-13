@@ -636,8 +636,7 @@ def _create_export_zip():
 
 def _ensure_backup_dir():
     """确保备份目录存在"""
-    if not os.path.exists(BACKUP_DIR):
-        os.makedirs(BACKUP_DIR)
+    os.makedirs(BACKUP_DIR, exist_ok=True)
 
 def _create_backup():
     """创建当前数据备份"""
@@ -689,15 +688,15 @@ def import_data():
     if not file.filename.endswith('.zip'):
         return jsonify({'status': 'error', 'message': '仅支持ZIP文件'}), 400
 
-    try:
-        # 保存上传文件到临时目录
-        temp_zip = tempfile.mktemp(suffix='.zip')
-        file.save(temp_zip)
+    # Create temp file safely (mktemp is deprecated)
+    with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_file:
+        temp_zip = temp_file.name
+    file.save(temp_zip)
 
+    try:
         # 验证ZIP结构
         valid, filenames = _validate_import_zip(temp_zip)
         if not valid:
-            os.remove(temp_zip)
             return jsonify({'status': 'error', 'message': 'ZIP文件缺少必需数据（config.json或records.db）'}), 400
 
         # 创建备份
@@ -719,12 +718,10 @@ def import_data():
                 temp_dir = tempfile.mkdtemp()
                 try:
                     zf.extract("records.db", temp_dir)
-                    shutil.copy(os.path.join(temp_dir, "records.db"), DB_PATH)
+                    with db_lock:
+                        shutil.copy(os.path.join(temp_dir, "records.db"), DB_PATH)
                 finally:
                     shutil.rmtree(temp_dir, ignore_errors=True)
-
-        # 清理临时ZIP
-        os.remove(temp_zip)
 
         # 重载配置
         scanner.load_config()
@@ -738,6 +735,12 @@ def import_data():
         import traceback
         traceback.print_exc()
         return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        # Always cleanup temp ZIP
+        try:
+            os.remove(temp_zip)
+        except:
+            pass
 
 @app.route('/api/data/export', methods=['GET'])
 def export_data():
