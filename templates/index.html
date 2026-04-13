@@ -823,6 +823,16 @@
             color: #22C55E;
             margin-left: 8px;
         }
+        /* Add Merchant Section */
+        .add-merchant-section {
+            background: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .add-merchant-section .input-group {
+            max-width: 300px;
+        }
         /* Merchant Limit Cards */
         .merchant-limits-grid {
             display: grid;
@@ -1198,11 +1208,6 @@
                                         <input type="text" id="config-target-platform" class="form-control" placeholder="如: 米奇租赁" data-section="order_scanner">
                                         <small class="text-muted">只处理该平台的订单</small>
                                     </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label" for="config-merchants">商家列表</label>
-                                        <textarea id="config-merchants" class="form-control" rows="2" placeholder="米奇租赁官方, 星享生活" data-section="order_scanner"></textarea>
-                                        <small class="text-muted">多个商家用逗号分隔</small>
-                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1279,6 +1284,17 @@
                         </h2>
                         <div id="collapseMerchantLimits" class="accordion-collapse collapse">
                             <div class="accordion-body">
+                                <!-- 新增商户区域 -->
+                                <div class="add-merchant-section mb-3">
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" id="new-merchant-name" class="form-control" placeholder="输入新商户名称...">
+                                        <button class="btn btn-sm btn-success" onclick="addNewMerchant()">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                                            新增商户
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">添加后可在关键词映射中分配订单</small>
+                                </div>
                                 <div id="merchant-limits-container" class="merchant-limits-grid">
                                     <div class="text-center py-4 text-muted">加载中...</div>
                                 </div>
@@ -1462,8 +1478,17 @@
 
                 <!-- 分单记录列表 -->
                 <div class="card mt-4">
-                    <div class="card-header">
-                        分单记录
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>分单记录 <small class="text-muted" id="records-total-info"></small></span>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-check-inline me-2">
+                                <input class="form-check-input" type="checkbox" id="records-auto-refresh">
+                                <label class="form-check-label" for="records-auto-refresh">自动刷新</label>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadRecords()">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body">
                         <table class="table table-sm">
@@ -1482,6 +1507,14 @@
                                 </tr>
                             </tbody>
                         </table>
+                        <!-- 分页控件 -->
+                        <div class="d-flex justify-content-between align-items-center mt-2" id="records-pagination" style="display:none;">
+                            <span class="text-muted small" id="records-page-info"></span>
+                            <div>
+                                <button class="btn btn-sm btn-outline-secondary me-1" id="records-prev-btn" onclick="recordsPrevPage()">上一页</button>
+                                <button class="btn btn-sm btn-outline-secondary" id="records-next-btn" onclick="recordsNextPage()">下一页</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1992,8 +2025,6 @@
                     document.getElementById('config-scan-interval-min').value = data.scan_interval_min || 30;
                     document.getElementById('config-scan-interval-max').value = data.scan_interval_max || 120;
                     document.getElementById('config-target-platform').value = data.target_platform || '米奇租赁';
-                    const merchants = data.merchants || [];
-                    document.getElementById('config-merchants').value = merchants.join(', ');
                     originalConfig.order_scanner = { ...data };
                 });
 
@@ -2091,16 +2122,13 @@
                     headless: document.getElementById('config-headless').checked
                 };
             } else if (section === 'order_scanner') {
-                const merchantsStr = document.getElementById('config-merchants').value;
-                const merchants = merchantsStr.split(',').map(m => m.trim()).filter(m => m);
                 data = {
                     url: document.getElementById('config-url').value,
                     merchant_url: document.getElementById('config-merchant-url').value,
                     scan_interval: parseInt(document.getElementById('config-scan-interval').value) || 60,
                     scan_interval_min: parseInt(document.getElementById('config-scan-interval-min').value) || 30,
                     scan_interval_max: parseInt(document.getElementById('config-scan-interval-max').value) || 120,
-                    target_platform: document.getElementById('config-target-platform').value || '米奇租赁',
-                    merchants: merchants
+                    target_platform: document.getElementById('config-target-platform').value || '米奇租赁'
                 };
             } else if (section === 'interface_monitor') {
                 data = {
@@ -2234,22 +2262,49 @@
                 });
 
             // Load records
-            fetch(`/api/stats/records?date=${date}&limit=50`)
+            loadRecords();
+        }
+
+        // 分单记录分页变量
+        let recordsOffset = 0;
+        const recordsPageSize = 20;
+        let recordsTotal = 0;
+        let recordsAutoRefreshTimer = null;
+        let lastRecordsCount = 0;
+
+        function loadRecords() {
+            const date = document.getElementById('stats-date').value;
+
+            fetch(`/api/stats/records?date=${date}&limit=${recordsPageSize}&offset=${recordsOffset}`)
                 .then(response => response.json())
                 .then(data => {
+                    recordsTotal = data.total;
+                    lastRecordsCount = data.total;
+                    updateRecordsPagination();
+
                     const tbody = document.getElementById('stats-records-body');
                     if (data.records.length === 0) {
                         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">无分单记录</td></tr>';
+                        document.getElementById('records-total-info').textContent = '';
                     } else {
-                        tbody.innerHTML = data.records.map(r => `
-                            <tr>
-                                <td>${r.created_at.split(' ')[1] || r.created_at}</td>
-                                <td>${r.matched_keyword || r.keyword_entry || '-'}</td>
-                                <td>${r.product || '-'}</td>
-                                <td>${r.merchant}</td>
-                                <td>${r.order_no || '-'}</td>
-                            </tr>
-                        `).join('');
+                        tbody.innerHTML = data.records.map(r => {
+                            const keyword = r.matched_keyword || r.keyword_entry || '';
+                            const keywordDisplay = keyword ? keyword : '<span class="text-muted">未匹配</span>';
+                            const product = r.product || '';
+                            const productDisplay = product ? product : '<span class="text-muted">-</span>';
+                            const orderNo = r.order_no || '';
+                            const orderNoDisplay = orderNo ? orderNo : '<span class="text-muted">-</span>';
+                            return `
+                                <tr>
+                                    <td>${r.created_at.split(' ')[1] || r.created_at}</td>
+                                    <td>${keywordDisplay}</td>
+                                    <td>${productDisplay}</td>
+                                    <td>${r.merchant}</td>
+                                    <td>${orderNoDisplay}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                        document.getElementById('records-total-info').textContent = `共 ${recordsTotal} 条`;
                     }
                 })
                 .catch(e => {
@@ -2257,9 +2312,81 @@
                 });
         }
 
+        function updateRecordsPagination() {
+            const pagination = document.getElementById('records-pagination');
+            const pageInfo = document.getElementById('records-page-info');
+            const prevBtn = document.getElementById('records-prev-btn');
+            const nextBtn = document.getElementById('records-next-btn');
+
+            if (recordsTotal > recordsPageSize) {
+                pagination.style.display = 'flex';
+                const currentPage = Math.floor(recordsOffset / recordsPageSize) + 1;
+                const totalPages = Math.ceil(recordsTotal / recordsPageSize);
+                pageInfo.textContent = `第 ${currentPage}/${totalPages} 页`;
+                prevBtn.disabled = recordsOffset === 0;
+                nextBtn.disabled = recordsOffset + recordsPageSize >= recordsTotal;
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+
+        function recordsPrevPage() {
+            if (recordsOffset > 0) {
+                recordsOffset -= recordsPageSize;
+                loadRecords();
+            }
+        }
+
+        function recordsNextPage() {
+            if (recordsOffset + recordsPageSize < recordsTotal) {
+                recordsOffset += recordsPageSize;
+                loadRecords();
+            }
+        }
+
+        // 自动刷新逻辑
+        document.getElementById('records-auto-refresh').addEventListener('change', function() {
+            if (this.checked) {
+                startRecordsAutoRefresh();
+            } else {
+                stopRecordsAutoRefresh();
+            }
+        });
+
+        function startRecordsAutoRefresh() {
+            if (recordsAutoRefreshTimer) return;
+            recordsAutoRefreshTimer = setInterval(() => {
+                // 检查是否有新记录
+                const date = document.getElementById('stats-date').value;
+                fetch(`/api/stats/records?date=${date}&limit=1&offset=0`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.total > lastRecordsCount) {
+                            // 有新记录，重置到第一页并刷新
+                            recordsOffset = 0;
+                            loadRecords();
+                        }
+                    });
+            }, 5000);
+        }
+
+        function stopRecordsAutoRefresh() {
+            if (recordsAutoRefreshTimer) {
+                clearInterval(recordsAutoRefreshTimer);
+                recordsAutoRefreshTimer = null;
+            }
+        }
+
         // Initialize stats tab on show
         document.getElementById('stats-tab').addEventListener('shown.bs.tab', function() {
             initStatsDate();
+            recordsOffset = 0;
+            loadStats();
+        });
+
+        // 日期变化时重置分页
+        document.getElementById('stats-date').addEventListener('change', function() {
+            recordsOffset = 0;
             loadStats();
         });
 
@@ -2501,7 +2628,7 @@
         });
 
         function deleteMerchant(merchant) {
-            if (!confirm(`确认删除商户「${merchant}」的所有配置？\n\n此操作将删除该商户的限额设置和所有 webhook 配置。`)) return;
+            if (!confirm(`确认删除商户「${merchant}」？\n\n此操作将清理:\n- 限额和 webhook 配置\n- 关键词映射中的引用\n- RPA 群映射配置\n\n该操作不可恢复。`)) return;
 
             fetch('/api/merchants/delete', {
                 method: 'POST',
@@ -2511,15 +2638,55 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    showToast(`已删除商户 ${merchant}`, 'success');
+                    const details = data.deleted_items ? '\n清理项目: ' + data.deleted_items.join(', ') : '';
+                    showToast(`已删除商户 ${merchant}${details}`, 'success');
                     loadMerchantLimits();
+                    // 重新加载关键词映射
+                    fetch('/api/config/keyword_mapping')
+                        .then(r => r.json())
+                        .then(d => {
+                            keywordMappingData = d;
+                            renderKeywordMappingTable();
+                            updateKeywordBadge();
+                        });
+                    // 更新 merchantList 供关键词映射使用
+                    fetch('/api/merchants').then(r => r.json()).then(d => merchantList = d);
                 } else {
-                    showToast(data.message || '删除失败', 'error');
+                    showToast(data.message, data.status === 'warning' ? 'warning' : 'error');
                 }
             })
             .catch(err => {
                 showToast('删除失败: ' + err.message, 'error');
             });
+        }
+
+        function addNewMerchant() {
+            const input = document.getElementById('new-merchant-name');
+            const merchant = input.value.trim();
+
+            if (!merchant) {
+                showToast('请输入商户名称', 'error');
+                return;
+            }
+
+            fetch('/api/merchants/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({merchant: merchant})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    input.value = '';
+                    loadMerchantLimits();
+                    // 更新 merchantList 供关键词映射使用
+                    fetch('/api/merchants').then(r => r.json()).then(d => merchantList = d);
+                } else {
+                    showToast(data.message, 'error');
+                }
+            })
+            .catch(err => showToast('添加失败: ' + err.message, 'error'));
         }
     </script>
 </body>

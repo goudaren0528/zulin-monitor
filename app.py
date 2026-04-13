@@ -5,7 +5,7 @@ import threading
 import sqlite3
 from main import scanner, LOG_BUFFER
 from monitor import monitor, MONITOR_LOG_BUFFER
-from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks, init_db, delete_merchant_config
+from db import get_daily_stats, get_merchant_totals, DB_PATH, db_lock, get_all_merchant_limits, set_merchant_limit, reset_merchant_limit, get_merchants_at_limit, set_merchant_config, get_merchant_webhooks, init_db, delete_merchant_config, get_merchant_config
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 config_lock = threading.Lock()
@@ -130,10 +130,10 @@ def handle_config_order_scanner():
     if request.method == 'GET':
         config = _load_full_config()
         order_config = config.get('order_scanner', {})
-        # 排除 keyword_mapping, webhook_configs, rpa_group_mapping
+        # 排除 keyword_mapping, webhook_configs, rpa_group_mapping, merchants
         simple_config = {}
         for key, value in order_config.items():
-            if key not in ['keyword_mapping', 'webhook_configs', 'rpa_group_mapping']:
+            if key not in ['keyword_mapping', 'webhook_configs', 'rpa_group_mapping', 'merchants']:
                 simple_config[key] = value
         return jsonify(simple_config)
     elif request.method == 'POST':
@@ -229,7 +229,7 @@ def handle_config_advanced():
 
 @app.route('/api/merchants', methods=['GET'])
 def get_merchants():
-    """获取所有商户名称列表（从 keyword_mapping 和 rpa_group_mapping 中提取）"""
+    """获取所有商户名称列表（从 keyword_mapping、rpa_group_mapping 和数据库中提取）"""
     config = _load_full_config()
     merchants = set()
     order_config = config.get('order_scanner', {})
@@ -239,8 +239,8 @@ def get_merchants():
     for keyword, value in keyword_mapping.items():
         if isinstance(value, str):
             merchants.add(value)
-        elif isinstance(value, list):
-            for item in value:
+        elif isinstance(value, dict):
+            for item in value.get('merchants', []):
                 if isinstance(item, dict):
                     merchants.add(item.get('merchant', ''))
 
@@ -249,11 +249,11 @@ def get_merchants():
     for merchant in rpa_mapping.keys():
         merchants.add(merchant)
 
-    # 从配置文件读取商家列表
-    config_merchants = order_config.get('merchants', [])
-    for m in config_merchants:
-        if m:
-            merchants.add(m)
+    # 从数据库提取（新增的商户可能尚未配置关键词映射）
+    db_merchants = get_all_merchant_limits()
+    for m in db_merchants:
+        if m.get('merchant'):
+            merchants.add(m['merchant'])
 
     # 过滤空值
     merchants = [m for m in merchants if m]
@@ -305,19 +305,20 @@ def get_daily_statistics():
 
 @app.route('/api/stats/records')
 def get_assignment_records():
-    """获取分单记录列表"""
+    """获取分单记录列表（支持分页）"""
     date = request.args.get('date', '')
     merchant = request.args.get('merchant', '')
-    limit = int(request.args.get('limit', 100))
+    limit = int(request.args.get('limit', 50))
+    offset = int(request.args.get('offset', 0))
 
     if not os.path.exists(DB_PATH):
-        return jsonify({'records': []})
+        return jsonify({'records': [], 'total': 0, 'has_more': False})
 
     with db_lock:
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
-        query = "SELECT created_at, keyword_entry, matched_keyword, merchant, product, order_no, order_title FROM assignment_records"
+        # 构建查询条件
         conditions = []
         params = []
 
@@ -328,11 +329,20 @@ def get_assignment_records():
             conditions.append("merchant = ?")
             params.append(merchant)
 
+        where_clause = ""
         if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+            where_clause = " WHERE " + " AND ".join(conditions)
 
-        query += " ORDER BY created_at DESC LIMIT ?"
-        params.append(limit)
+        # 先获取总数
+        count_query = "SELECT COUNT(*) FROM assignment_records" + where_clause
+        cursor.execute(count_query, params)
+        total = cursor.fetchone()[0]
+
+        # 获取记录
+        query = "SELECT created_at, keyword_entry, matched_keyword, merchant, product, order_no, order_title FROM assignment_records"
+        query += where_clause
+        query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
 
         cursor.execute(query, params)
         records = [{
@@ -346,7 +356,11 @@ def get_assignment_records():
         } for row in cursor.fetchall()]
         conn.close()
 
-    return jsonify({'records': records})
+    return jsonify({
+        'records': records,
+        'total': total,
+        'has_more': offset + len(records) < total
+    })
 
 # --- Merchant Config API ---
 @app.route('/api/merchants/limits', methods=['GET', 'POST'])
@@ -431,17 +445,131 @@ def reset_all_merchants():
 
 @app.route('/api/merchants/delete', methods=['POST'])
 def delete_merchant():
-    """删除商户配置"""
+    """删除商户 - 清理数据库和配置文件所有引用"""
     data = request.json
     merchant = data.get('merchant')
     if not merchant:
         return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
 
-    deleted = delete_merchant_config(merchant=merchant)
-    if deleted:
-        return jsonify({'status': 'success', 'message': f'已删除商户 {merchant}'})
+    deleted_items = []
+
+    # 1. 删除数据库记录
+    db_deleted = delete_merchant_config(merchant=merchant)
+    if db_deleted:
+        deleted_items.append('数据库配置')
+
+    # 2. 清理配置文件
+    config = _load_full_config()
+    order_config = config.get('order_scanner', {})
+    config_changed = False
+
+    # 清理 keyword_mapping 中包含该商户的规则
+    keyword_mapping = order_config.get('keyword_mapping', {})
+    new_mapping = {}
+    for kw, value in keyword_mapping.items():
+        if isinstance(value, str):
+            if value != merchant:
+                new_mapping[kw] = value
+            else:
+                deleted_items.append(f'关键词映射 "{kw}"')
+                config_changed = True
+        elif isinstance(value, dict):
+            merchants = value.get('merchants', [])
+            new_merchants = [m for m in merchants if m.get('merchant') != merchant]
+            if len(new_merchants) < len(merchants):
+                config_changed = True
+                deleted_items.append(f'关键词映射 "{kw}" 中的商户引用')
+            if new_merchants:
+                new_mapping[kw] = {
+                    'product': value.get('product', ''),
+                    'merchants': new_merchants
+                }
+            else:
+                deleted_items.append(f'关键词映射 "{kw}" (规则已无商户)')
+        elif isinstance(value, list):
+            new_merchants = [m for m in value if m.get('merchant') != merchant]
+            if new_merchants:
+                new_mapping[kw] = new_merchants
+            else:
+                deleted_items.append(f'关键词映射 "{kw}"')
+            if len(new_merchants) < len(value):
+                config_changed = True
+
+    if config_changed:
+        config['order_scanner']['keyword_mapping'] = new_mapping
+
+    # 清理 rpa_group_mapping
+    rpa_mapping = order_config.get('rpa_group_mapping', {})
+    if merchant in rpa_mapping:
+        del rpa_mapping[merchant]
+        config['order_scanner']['rpa_group_mapping'] = rpa_mapping
+        deleted_items.append('RPA群映射')
+        config_changed = True
+
+    # 清理 merchants 数组（如果存在）
+    merchants_list = order_config.get('merchants', [])
+    if merchant in merchants_list:
+        merchants_list = [m for m in merchants_list if m != merchant]
+        config['order_scanner']['merchants'] = merchants_list
+        deleted_items.append('配置商家列表')
+        config_changed = True
+
+    # 保存配置文件
+    if config_changed:
+        _save_full_config(config)
+
+    if deleted_items:
+        return jsonify({
+            'status': 'success',
+            'message': f'已删除商户 {merchant}',
+            'deleted_items': deleted_items
+        })
     else:
-        return jsonify({'status': 'error', 'message': '商户不存在或删除失败'}), 404
+        return jsonify({
+            'status': 'warning',
+            'message': f'商户 {merchant} 无相关数据需要清理'
+        })
+
+@app.route('/api/merchants/add', methods=['POST'])
+def add_merchant():
+    """新增商户 - 仅在数据库创建记录"""
+    data = request.json
+    merchant = data.get('merchant', '').strip()
+
+    if not merchant:
+        return jsonify({'status': 'error', 'message': '商户名称不能为空'}), 400
+
+    # 检查是否已存在（在 keyword_mapping 或数据库中）
+    config = _load_full_config()
+    order_config = config.get('order_scanner', {})
+    keyword_mapping = order_config.get('keyword_mapping', {})
+
+    # 检查 keyword_mapping 中是否已有此商户
+    for kw, value in keyword_mapping.items():
+        if isinstance(value, str) and value == merchant:
+            return jsonify({'status': 'error', 'message': '商户已存在于关键词映射中'}), 400
+        elif isinstance(value, dict):
+            merchants = value.get('merchants', [])
+            for m in merchants:
+                if m.get('merchant') == merchant:
+                    return jsonify({'status': 'error', 'message': '商户已存在于关键词映射中'}), 400
+        elif isinstance(value, list):
+            for m in value:
+                if m.get('merchant') == merchant:
+                    return jsonify({'status': 'error', 'message': '商户已存在于关键词映射中'}), 400
+
+    # 检查数据库中是否已存在
+    existing_config = get_merchant_config(merchant=merchant)
+    if existing_config:
+        return jsonify({'status': 'error', 'message': '商户已存在'}), 400
+
+    # 在数据库中创建记录（初始限额为0，无webhook）
+    set_merchant_config(merchant=merchant, limit_value=0, webhook_urls=[])
+
+    return jsonify({
+        'status': 'success',
+        'message': f'已添加商户 {merchant}，请在关键词映射中配置分配规则'
+    })
 
 if __name__ == '__main__':
     # Initialize database
