@@ -1699,6 +1699,158 @@
             }, 3000);
         }
 
+        // --- Data Management Functions ---
+        function exportData() {
+            const statusEl = document.getElementById('export-status');
+            statusEl.textContent = '正在导出...';
+
+            fetch('/api/data/export')
+                .then(response => {
+                    if (!response.ok) throw new Error('导出失败');
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'order-point-export.zip';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+                    statusEl.textContent = '导出完成';
+                    showToast('数据已成功导出', 'success');
+                })
+                .catch(err => {
+                    statusEl.textContent = '导出失败';
+                    showToast('导出失败: ' + err.message, 'error');
+                });
+        }
+
+        function handleImportFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const fileNameEl = document.getElementById('import-file-name');
+            fileNameEl.textContent = file.name;
+
+            // 确认导入
+            if (!confirm('导入将完全替换当前数据，确定继续吗？')) {
+                input.value = '';
+                fileNameEl.textContent = '';
+                return;
+            }
+
+            const progressEl = document.getElementById('import-progress');
+            const resultEl = document.getElementById('import-result');
+            progressEl.style.display = 'block';
+            resultEl.innerHTML = '';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/data/import', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                progressEl.style.display = 'none';
+                if (data.status === 'success') {
+                    resultEl.innerHTML = `<div class="alert alert-success">${data.message}<br><small>备份文件: ${data.backup_file}</small></div>`;
+                    showToast('数据导入成功', 'success');
+                    // 刷新备份列表
+                    loadBackups();
+                } else {
+                    resultEl.innerHTML = `<div class="alert alert-danger">${data.message}</div>`;
+                    showToast('导入失败', 'error');
+                }
+            })
+            .catch(err => {
+                progressEl.style.display = 'none';
+                resultEl.innerHTML = `<div class="alert alert-danger">导入失败: ${err.message}</div>`;
+                showToast('导入失败', 'error');
+            });
+        }
+
+        function loadBackups() {
+            fetch('/api/data/backups')
+                .then(response => response.json())
+                .then(data => {
+                    const tbody = document.getElementById('backups-list-body');
+                    if (data.backups.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无备份</td></tr>';
+                        return;
+                    }
+                    tbody.innerHTML = data.backups.map(b => `
+                        <tr>
+                            <td><small>${b.filename}</small></td>
+                            <td><small>${b.created_at}</small></td>
+                            <td><small>${formatFileSize(b.size)}</small></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary me-1" onclick="restoreBackup('${b.filename}')">恢复</button>
+                                <button class="btn btn-sm btn-outline-secondary me-1" onclick="downloadBackup('${b.filename}')">下载</button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteBackup('${b.filename}')">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(err => {
+                    document.getElementById('backups-list-body').innerHTML = `<tr><td colspan="4" class="text-center text-danger">加载失败</td></tr>`;
+                });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function restoreBackup(filename) {
+            if (!confirm(`恢复备份 ${filename} 将替换当前数据，确定继续吗？`)) return;
+
+            fetch(`/api/data/backup/${filename}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast(data.message, 'success');
+                        loadBackups();
+                    } else {
+                        showToast('恢复失败: ' + data.message, 'error');
+                    }
+                })
+                .catch(err => showToast('恢复失败', 'error'));
+        }
+
+        function downloadBackup(filename) {
+            const a = document.createElement('a');
+            a.href = `/api/data/backup/${filename}`;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        function deleteBackup(filename) {
+            if (!confirm(`确定删除备份 ${filename} 吗？`)) return;
+
+            fetch(`/api/data/backup/${filename}`, { method: 'DELETE' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        showToast(data.message, 'success');
+                        loadBackups();
+                    } else {
+                        showToast('删除失败: ' + data.message, 'error');
+                    }
+                })
+                .catch(err => showToast('删除失败', 'error'));
+        }
+
+        // 加载备份列表（页面加载时）
+        // 在data tab被点击时加载
+        document.getElementById('data-tab').addEventListener('shown.bs.tab', loadBackups);
+
         function updateTime() {
             const now = new Date();
             document.getElementById('sys-time').textContent = now.toLocaleTimeString();
