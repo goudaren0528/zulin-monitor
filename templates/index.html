@@ -817,7 +817,7 @@
 
         /* Statistics Tab Styles */
         .stats-container {
-            padding: 20px;
+            padding: 0;
         }
         .stats-summary {
             display: flex;
@@ -1553,8 +1553,10 @@
 
         <!-- Data Management Tab -->
         <div class="tab-pane fade" id="data" role="tabpanel" aria-labelledby="data-tab">
-            <!-- Export Section -->
-            <div class="card mb-4">
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <!-- Export Section -->
+                    <div class="card mb-4">
                 <div class="card-header">
                     <span class="section-title">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1646,6 +1648,8 @@
                             </tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
                 </div>
             </div>
         </div>
