@@ -529,6 +529,26 @@
             50% { opacity: 0.7; }
         }
 
+        /* Import Upload Area */
+        .import-upload-area {
+            border: 2px dashed var(--color-border);
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+            transition: border-color var(--transition-normal) var(--ease-out);
+            background-color: var(--color-muted);
+        }
+
+        .import-upload-area:hover {
+            border-color: var(--color-primary);
+            background-color: #F1F5FD;
+        }
+
+        .import-upload-area.dragover {
+            border-color: var(--color-accent);
+            background-color: #ECFDF5;
+        }
+
         /* Floating Save Bar */
         .floating-save-bar {
             position: sticky;
@@ -1770,6 +1790,30 @@
                 progressEl.style.display = 'none';
                 resultEl.innerHTML = `<div class="alert alert-danger">导入失败: ${err.message}</div>`;
                 showToast('导入失败', 'error');
+            });
+        }
+
+        // 拖拽上传支持
+        const dropZone = document.getElementById('import-drop-zone');
+        if (dropZone) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].name.endsWith('.zip')) {
+                    const input = document.getElementById('import-file-input');
+                    input.files = files;
+                    handleImportFile(input);
+                } else {
+                    showToast('请上传ZIP文件', 'error');
+                }
             });
         }
 
