@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.claude/
+*.md
+tests/
+.pytest_cache/
+debug.log
+debug_*.png
