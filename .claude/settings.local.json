@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from main import OrderScanner; print\\(''OK''\\)\")",
+      "Bash(python -c \"from app import app; routes = [r.rule for r in app.url_map.iter_rules\\(\\)]; print\\(''\\\\n''.join\\([r for r in routes if ''config'' in r or ''merchants'' in r]\\)\\)\")",
+      "Bash(python -c \"from app import app; print\\(''Flask app loads OK''\\)\")",
+      "Bash(python -c \":*)",
+      "Bash(python -c \"from main import OrderScanner; from app import app; print\\(''OK''\\)\")",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(ls -la config*.json)",
+      "Bash(curl -s http://localhost:5050/api/config/keyword_mapping)",
+      "Bash(cd:*)",
+      "Bash(winget install:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(curl:*)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5050)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(pkill -f \"python app.py\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "Bash(killall python:*)"
+    ]
+  }
+}

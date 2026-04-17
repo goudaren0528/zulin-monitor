@@ -1,0 +1,568 @@
+{
+    "common": {
+        "username": "伟填",
+        "password": "Test0528.",
+        "headless": true
+    },
+    "interface_monitor": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=statistics.interface_log",
+        "scan_interval": 43200,
+        "webhook_url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d",
+        "headless": true,
+        "items": [
+            {
+                "name": "E签宝静默签人脸",
+                "threshold": 100
+            },
+            {
+                "name": "E签宝静默签合同",
+                "threshold": 100
+            },
+            {
+                "name": "E签宝静默签商家授权",
+                "threshold": 10
+            },
+            {
+                "name": "短信发送",
+                "threshold": 200
+            },
+            {
+                "name": "OCR识别",
+                "threshold": 200
+            },
+            {
+                "name": "百融风控",
+                "threshold": 100
+            }
+        ]
+    },
+    "order_scanner": {
+        "url": "https://szguokuai.zlj.xyzulin.top/web/index.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "merchant_url": "https://szguokuai.zlj.xyzulin.top/web/merchant.php?c=site&a=entry&m=ewei_shopv2&do=web&r=order.list.status1",
+        "scan_interval": 120,
+        "scan_interval_min": 90,
+        "scan_interval_max": 180,
+        "target_platform": "团团享",
+        "keyword_mapping": {
+            "CP1500": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": "CP1500"
+            },
+            "G7X2, G7X Mark II": {
+                "merchants": [
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": "G7X2"
+            },
+            "G7X3, G7X Mark III": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": "G7X3"
+            },
+            "Galaxy S23Ultra, S23, s23, s23u": {
+                "product": "Galaxy S23Ultra",
+                "merchants": [
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "熊猫租",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    }
+                ]
+            },
+            "RF100-400mm": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "SQ1, Square1, Square 1, SQ 1": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": "富士SQ1"
+            },
+            "SX740": {
+                "product": "",
+                "merchants": [
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    }
+                ]
+            },
+            "Ulike air3, air3, air 3": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    }
+                ],
+                "product": "Ulike air3脱毛仪"
+            },
+            "X200Ultra, X200 Ultra, X 200 Ultra, X200U": {
+                "product": "vivo X200U",
+                "merchants": [
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "怪怪大魔王",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星瓷租赁",
+                        "weight": 1
+                    }
+                ]
+            },
+            "X300, X300Pro, X300 Pro": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "怪怪大魔王",
+                        "weight": 1
+                    }
+                ],
+                "product": "vivo X300P"
+            },
+            "action4, action4 pro, action4pro": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": "大疆Action4Pro"
+            },
+            "ipad, IPAD, iPAD": {
+                "merchants": [
+                    {
+                        "merchant": "方寸",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "iphone17 pro max, iphone 17 pro max, iphone17pro max, iPhone 17 Pro max": {
+                "merchants": [
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "怪怪大魔王",
+                        "weight": 1
+                    }
+                ],
+                "product": "iPhone 17 Pro Max"
+            },
+            "iphone17 pro, iphone 17 pro, iphone17pro, iPhone 17 Pro": {
+                "merchants": [
+                    {
+                        "merchant": "小橙租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": "iPhone 17 Pro"
+            },
+            "mini11": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "mini12": {
+                "product": "",
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    }
+                ]
+            },
+            "mini40": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "mini90": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "mini99": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "pocket3, Pocket3, pocket 3, Pocket 3": {
+                "merchants": [
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "vivoX200Ultra增距镜, 蔡司 2.35x增距镜": {
+                "merchants": [
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    }
+                ],
+                "product": "vivoX200Ultra增距镜"
+            },
+            "wide 300, wide300": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    }
+                ],
+                "product": "wide 300"
+            },
+            "wide EVO, wideEVO, WIDE EVO": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": "富士wide EVO"
+            },
+            "wide400, wide 400, WIDE400, WIDE 400": {
+                "merchants": [
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": "富士Wide 400"
+            },
+            "佳能 G11, 佳能G11": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "佳能 G9, 佳能G9": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "佳能 R50, Eos R50": {
+                "product": "佳能 R50",
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "九月伞数码",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星瓷租赁",
+                        "weight": 1
+                    }
+                ]
+            },
+            "佳能 RF50m": {
+                "product": "",
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    }
+                ]
+            },
+            "佳能RF-S 18-150": {
+                "product": "",
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    }
+                ]
+            },
+            "佳能RF-S 55-210": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "佳能SX70, SX70, SX 70, 佳能 SX70": {
+                "product": "佳能SX70",
+                "merchants": [
+                    {
+                        "merchant": "九月伞数码",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星瓷租赁",
+                        "weight": 1
+                    }
+                ]
+            },
+            "佳能ixus130": {
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "大疆 nano, nano, 大疆 Osmo nano, 大疆Osmo nano": {
+                "merchants": [
+                    {
+                        "merchant": "深圳活力租赁",
+                        "weight": 1
+                    }
+                ],
+                "product": "大疆 Osmo nano"
+            },
+            "尼康": {
+                "merchants": [
+                    {
+                        "merchant": "星享生活",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "影石X5": {
+                "merchants": [
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    }
+                ],
+                "product": ""
+            },
+            "松下ZS99": {
+                "product": "",
+                "merchants": [
+                    {
+                        "merchant": "弘泰优品",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星瓷租赁",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "团团享租奥丰店",
+                        "weight": 1
+                    }
+                ]
+            },
+            "pocket4, pocket 4, Pocket4, Pocket 4": {
+                "product": "大疆Pocket4",
+                "merchants": [
+                    {
+                        "merchant": "西西租赁",
+                        "weight": 1
+                    }
+                ]
+            },
+            "action5pro, action 5pro, action 5 pro": {
+                "product": "大疆action 5pro",
+                "merchants": [
+                    {
+                        "merchant": "米奇租赁官方",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "九月伞数码",
+                        "weight": 1
+                    },
+                    {
+                        "merchant": "星瓷租赁",
+                        "weight": 1
+                    }
+                ]
+            }
+        },
+        "webhook_configs": [
+            {
+                "targets": [
+                    "*"
+                ],
+                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=d954ddc2-fe59-47ae-b0ae-44621040f33d"
+            },
+            {
+                "targets": [
+                    "米奇租赁官方"
+                ],
+                "url": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=69e5af6a-1d92-4b73-8bf9-157c22480833"
+            }
+        ],
+        "rpa_group_mapping": {
+            "星享生活": "星享生活米奇支付宝入驻"
+        }
+    }
+}
