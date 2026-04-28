@@ -1,4 +1,4 @@
-﻿# highlight_helper.py
+﻿﻿# highlight_helper.py
 # Playwright 运行时元素高亮辅助模块
 # 功能：在脚本正常执行的同时，高亮显示当前操作的元素
 
