@@ -6,6 +6,7 @@ import threading
 import sys
 from playwright.sync_api import sync_playwright
 from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks
+from highlight_helper import init_highlight, highlight_locator, highlight_by_selector, HIGHLIGHT_ENABLED
 
 # Try importing Windows-specific libraries safely
 try:
@@ -638,6 +639,13 @@ class OrderScanner:
                     context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined});")
                 page = context.new_page()
 
+                if HIGHLIGHT_ENABLED:
+                    try:
+                        init_highlight(page)
+                        log("元素高亮功能已初始化")
+                    except Exception as e:
+                        log(f"元素高亮功能初始化失败: {e}")
+
                 import random
 
                 action_delay_min_ms = self.get_config("action_delay_min_ms", 80)
@@ -673,6 +681,8 @@ class OrderScanner:
                         loc.scroll_into_view_if_needed(timeout=timeout_ms)
                     except Exception:
                         pass
+                    if HIGHLIGHT_ENABLED:
+                        highlight_by_selector(page, selector, "focus: input")
                     try:
                         loc.click(timeout=timeout_ms)
                     except Exception:
@@ -760,6 +770,8 @@ class OrderScanner:
                             except Exception:
                                 pass
                             _human_pause()
+                            if HIGHLIGHT_ENABLED:
+                                highlight_by_selector(page, sel, "click")
                             try:
                                 loc.click()
                             except Exception:
@@ -1129,6 +1141,8 @@ class OrderScanner:
                                             btn_to_click.scroll_into_view_if_needed(timeout=5000)
                                         except Exception:
                                             pass
+                                        if HIGHLIGHT_ENABLED:
+                                            highlight_locator(page, btn_to_click, "click")
                                         try:
                                             btn_to_click.click(timeout=8000, no_wait_after=True)
                                         except Exception:
@@ -1139,6 +1153,8 @@ class OrderScanner:
                                             assign_btn.first.scroll_into_view_if_needed(timeout=5000)
                                         except Exception:
                                             pass
+                                        if HIGHLIGHT_ENABLED:
+                                            highlight_locator(page, assign_btn.first, "click")
                                         try:
                                             assign_btn.first.click(timeout=8000, no_wait_after=True)
                                         except Exception:
@@ -1160,6 +1176,8 @@ class OrderScanner:
                                             dropdown.scroll_into_view_if_needed(timeout=5000)
                                         except Exception:
                                             pass
+                                        if HIGHLIGHT_ENABLED:
+                                            highlight_locator(page, dropdown, "click")
                                         try:
                                             dropdown.click(timeout=8000, no_wait_after=True)
                                         except Exception:
@@ -1173,6 +1191,8 @@ class OrderScanner:
                                         search_input.wait_for(state="visible", timeout=8000)
                                         
                                         log(f"输入商户名称: {target_option}")
+                                        if HIGHLIGHT_ENABLED:
+                                            highlight_locator(page, search_input, "focus: input")
                                         search_input.fill(target_option)
                                         time.sleep(1) # Wait for search results
                                         search_input.press("Enter")
@@ -1182,6 +1202,8 @@ class OrderScanner:
                                         try:
                                             ajax_confirm = modal.locator("form > div > div > div.modal-footer > button.btn.btn-primary").first
                                             if ajax_confirm.count() > 0 and ajax_confirm.is_visible():
+                                                if HIGHLIGHT_ENABLED:
+                                                    highlight_locator(page, ajax_confirm, "click")
                                                 ajax_confirm.click(timeout=8000, no_wait_after=True)
                                                 log("分配操作提交完成")
                                             else:
@@ -1190,6 +1212,8 @@ class OrderScanner:
                                                 if visible_modal.count() > 0:
                                                     confirm_btn = visible_modal.locator("button.btn-primary, button:has-text('确定'), button:has-text('确认'), input[value='确定'], input[value='确认']").first
                                                     if confirm_btn.count() > 0 and confirm_btn.is_visible():
+                                                        if HIGHLIGHT_ENABLED:
+                                                            highlight_locator(page, confirm_btn, "click")
                                                         confirm_btn.click(timeout=8000, no_wait_after=True)
                                                         log("分配操作提交完成")
                                                     else:
@@ -1201,6 +1225,8 @@ class OrderScanner:
                                                 else:
                                                     # Fallback to global search if modal structure is different
                                                     confirm_btn = page.locator("button:has-text('确定'), button:has-text('确认'), input[value='确定']").filter(has=page.locator("visible=true")).last
+                                                    if HIGHLIGHT_ENABLED:
+                                                        highlight_locator(page, confirm_btn, "click")
                                                     confirm_btn.click(timeout=8000, no_wait_after=True)
                                                     log("分配操作提交完成 (Fallback)")
                                         except Exception as e:

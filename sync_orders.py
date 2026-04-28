@@ -4,6 +4,7 @@ import json
 import os
 import threading
 from playwright.sync_api import sync_playwright
+from highlight_helper import init_highlight, highlight_locator, highlight_by_selector, HIGHLIGHT_ENABLED
 
 # Global log buffer for Web UI
 SYNC_LOG_BUFFER = []
@@ -128,6 +129,13 @@ class OrderSync:
                 context = browser.new_context()
                 page = context.new_page()
 
+                if HIGHLIGHT_ENABLED:
+                    try:
+                        init_highlight(page)
+                        sync_log("元素高亮功能已初始化")
+                    except Exception as e:
+                        sync_log(f"元素高亮功能初始化失败: {e}")
+
                 sync_log(f"正在访问: {url}")
                 try:
                     page.goto(url)
@@ -143,8 +151,14 @@ class OrderSync:
                         try:
                             page.wait_for_selector(user_selector, timeout=5000)
                             sync_log("检测到登录页面，开始自动登录...")
+                            if HIGHLIGHT_ENABLED:
+                                highlight_by_selector(page, user_selector, "focus: input")
                             page.fill(user_selector, username)
+                            if HIGHLIGHT_ENABLED:
+                                highlight_by_selector(page, pass_selector, "focus: input")
                             page.fill(pass_selector, password)
+                            if HIGHLIGHT_ENABLED:
+                                highlight_by_selector(page, pass_selector, "press: Enter")
                             page.press(pass_selector, "Enter")
                             page.wait_for_load_state("networkidle")
                             sync_log("登录操作完成，正在跳转到目标页面...")
@@ -186,9 +200,13 @@ class OrderSync:
                             sync_log(f"正在处理订单: {order_sn}")
                             try:
                                 # 1. Input Order SN
-                                page.fill("#ordersn", str(order_sn))
-                                
+                                if HIGHLIGHT_ENABLED:
+                                    highlight_by_selector(page, "#ordersn", "focus: input")
+                                page.fill("#ordersn", str(order_sn)) 
+
                                 # 2. Click Search
+                                if HIGHLIGHT_ENABLED:
+                                    highlight_by_selector(page, "#search", "click")
                                 page.click("#search")
                                 
                                 # Wait for results
@@ -262,6 +280,8 @@ class OrderSync:
                                     action_btn = status_el.locator("a.op.text-primary").first
                                     
                                     if action_btn.is_visible():
+                                        if HIGHLIGHT_ENABLED:
+                                            highlight_locator(page, action_btn, "click")
                                         action_btn.click()
                                         
                                         # Wait for modal #ajaxModal
@@ -289,6 +309,8 @@ class OrderSync:
                                             sync_log(f"物流信息: {company} | {track_no} | {latest_info[:20]}...")
                                             
                                             # Close modal
+                                            if HIGHLIGHT_ENABLED:
+                                                highlight_by_selector(page, "#ajaxModal .close", "click")
                                             page.locator("#ajaxModal .close").click()
                                             time.sleep(0.5)
                                             
