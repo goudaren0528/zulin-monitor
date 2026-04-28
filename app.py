@@ -402,7 +402,7 @@ def handle_merchant_limits():
                     'webhook_urls': [],
                     'current_count': 0,
                     'last_reset_at': '',
-                    'is_at_limit': False
+                    'is_at_limit': True  # 限额为 0 表示禁用分配
                 })
 
         return jsonify({'merchants': limits})
@@ -572,7 +572,7 @@ def add_merchant():
 
     return jsonify({
         'status': 'success',
-        'message': f'已添加商户 {merchant}，请在关键词映射中配置分配规则'
+        'message': f'已添加商户 {merchant}（默认限额为0，暂不参与分配），请设置限额并配置关键词映射'
     })
 
 # --- Data Management API ---
