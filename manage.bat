@@ -4,20 +4,20 @@ setlocal
 
 echo.
 echo ============================================================
-echo    Order Point 服务管理脚本
+echo    Order Point Service Management
 echo ============================================================
 echo.
-echo    1. 查看运行状态
-echo    2. 查看实时日志
-echo    3. 重启服务
-echo    4. 停止服务
-echo    5. 启动服务
-echo    6. 重新构建并启动
-echo    7. 进入容器内部
-echo    0. 退出
+echo    1. Check Status
+echo    2. View Logs
+echo    3. Restart Service
+echo    4. Stop Service
+echo    5. Start Service
+echo    6. Rebuild and Restart
+echo    7. Enter Container
+echo    0. Exit
 echo.
 
-set /p "choice=请输入选项: "
+set /p "choice=Enter option: "
 
 if "%choice%"=="1" goto status
 if "%choice%"=="2" goto logs
@@ -31,6 +31,7 @@ goto invalid
 
 :status
 echo.
+echo    Getting status...
 docker ps --filter "name=order-point" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo.
 pause
@@ -38,17 +39,19 @@ goto end
 
 :logs
 echo.
-echo    按 Ctrl+C 退出日志查看
+echo    Viewing logs (Press Ctrl+C to exit)...
 echo.
 docker logs -f order-point
 goto end
 
 :restart
 echo.
-echo    正在重启...
+echo    Restarting service...
 docker restart order-point
-echo    重启完成
+echo    Restart completed
 timeout /t 2 /nobreak >nul
+echo.
+echo    Service status:
 docker ps --filter "name=order-point" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo.
 pause
@@ -56,19 +59,21 @@ goto end
 
 :stop
 echo.
-echo    正在停止...
+echo    Stopping service...
 docker stop order-point
-echo    已停止
+echo    Service stopped
 echo.
 pause
 goto end
 
 :start
 echo.
-echo    正在启动...
+echo    Starting service...
 docker start order-point
-echo    已启动
+echo    Service started
 timeout /t 2 /nobreak >nul
+echo.
+echo    Service status:
 docker ps --filter "name=order-point" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo.
 pause
@@ -76,17 +81,19 @@ goto end
 
 :rebuild
 echo.
-echo    正在重新构建（--no-cache）...
+echo    Rebuilding image (--no-cache)...
 docker-compose -f docker-compose.local.yml build --no-cache
 if errorlevel 1 (
-    echo    构建失败
+    echo    Build failed, check error message
     pause
     goto end
 )
-echo    构建成功，正在重启...
+echo    Build successful, restarting...
 docker-compose -f docker-compose.local.yml up -d
-echo    完成
+echo    Completed
 timeout /t 2 /nobreak >nul
+echo.
+echo    Service status:
 docker ps --filter "name=order-point" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo.
 pause
@@ -94,15 +101,15 @@ goto end
 
 :shell
 echo.
-echo    进入容器内部（输入 exit 退出）...
+echo    Entering container (type exit to quit)...
+echo.
 docker exec -it order-point bash
 goto end
 
 :invalid
 echo.
-echo    无效选项
+echo    Invalid option, please enter number 0-7
 echo.
 pause
 goto end
 
-:end

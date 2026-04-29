@@ -1,4 +1,4 @@
-# highlight_helper.py
+﻿# highlight_helper.py
 # Playwright 运行时元素高亮辅助模块
 # 功能：在脚本正常执行的同时，高亮显示当前操作的元素
 
@@ -135,8 +135,9 @@ def init_highlight(page):
                 }}
             }})();
         """)
-    except Exception:
-        pass
+        print("[Highlight] 高亮功能初始化成功")
+    except Exception as e:
+        print(f"[Highlight] 高亮功能初始化失败: {e}")
 
 def highlight_by_selector(page, selector, action_type="click", duration=1500):
     if not HIGHLIGHT_ENABLED:
@@ -152,8 +153,8 @@ def highlight_by_selector(page, selector, action_type="click", duration=1500):
             }})();
         """
         page.evaluate(js_code)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Highlight] 高亮失败 (selector={selector}): {e}")
 
 def highlight_locator(page, locator, action_type="click", duration=1500):
     if not HIGHLIGHT_ENABLED:
@@ -168,5 +169,5 @@ def highlight_locator(page, locator, action_type="click", duration=1500):
                 }
             })(arguments[0], arguments[1], arguments[2]);
         """, element, action_type, duration)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[Highlight] 高亮失败 (action={action_type}): {e}")
