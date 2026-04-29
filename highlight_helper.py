@@ -1,4 +1,4 @@
-﻿﻿# highlight_helper.py
+# highlight_helper.py
 # Playwright 运行时元素高亮辅助模块
 # 功能：在脚本正常执行的同时，高亮显示当前操作的元素
 
@@ -121,26 +121,24 @@ HIGHLIGHT_JS = """
 """
 
 def init_highlight(page):
-    """初始化高亮功能，在页面加载后调用一次"""
     if not HIGHLIGHT_ENABLED:
         return
     try:
         page.evaluate(HIGHLIGHT_JS)
-        page.evaluate("""
-            (function() {
+        page.evaluate(f"""
+            (function() {{
                 var style = document.createElement('style');
-                style.textContent = `""" + HIGHLIGHT_CSS + """`;
-                if (!document.getElementById('playwright-highlight-style')) {
+                style.textContent = `{HIGHLIGHT_CSS}`;
+                if (!document.getElementById('playwright-highlight-style')) {{
                     style.id = 'playwright-highlight-style';
                     document.head.appendChild(style);
-                }
-            })();
+                }}
+            }})();
         """)
     except Exception:
         pass
 
 def highlight_by_selector(page, selector, action_type="click", duration=1500):
-    """通过 CSS 选择器高亮元素"""
     if not HIGHLIGHT_ENABLED:
         return
     try:
@@ -158,7 +156,6 @@ def highlight_by_selector(page, selector, action_type="click", duration=1500):
         pass
 
 def highlight_locator(page, locator, action_type="click", duration=1500):
-    """通过 Playwright locator 高亮元素"""
     if not HIGHLIGHT_ENABLED:
         return
     try:
