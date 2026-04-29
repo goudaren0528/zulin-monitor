@@ -787,6 +787,11 @@ class OrderScanner:
                                     page.wait_for_load_state("networkidle", timeout=timeout_ms)
                                 except Exception:
                                     pass
+                            if HIGHLIGHT_ENABLED:
+                                try:
+                                    init_highlight(page)
+                                except Exception:
+                                    pass
                             log(f"导航等待完成: {label} selector={sel} {_safe_page_state()}")
                             return
                         except Exception as e:
@@ -813,6 +818,11 @@ class OrderScanner:
                                     page.wait_for_load_state("networkidle", timeout=20000)
                                 except Exception:
                                     pass
+                                if HIGHLIGHT_ENABLED:
+                                    try:
+                                        init_highlight(page)
+                                    except Exception:
+                                        pass
                                 s = None
                                 try:
                                     s = r.status if r else None
@@ -860,7 +870,7 @@ class OrderScanner:
                                 log("未检测到登录表单，可能已处于登录态，跳过登录")
                             log(f"登录流程结束 {_safe_page_state()}")
 
-                            _click_nav("#navheight > li:nth-child(5) > a", "订单菜单")
+                            _click_nav("a.system_menu[menu_id='order_menu']", "订单菜单")
                             _click_nav("body > div.wb-subnav > div > div:nth-child(4)", "订单列表菜单")
                             _click_nav(
                                 [
@@ -946,6 +956,11 @@ class OrderScanner:
                         try:
                             page.reload(timeout=60000)
                             page.wait_for_load_state("networkidle", timeout=60000)
+                            if HIGHLIGHT_ENABLED:
+                                try:
+                                    init_highlight(page)
+                                except Exception:
+                                    pass
                         except:
                             pass
                         continue
@@ -966,9 +981,16 @@ class OrderScanner:
 
                         if not is_active and target_link.count() > 0:
                             log("点击 '待审' Tab...")
+                            if HIGHLIGHT_ENABLED:
+                                highlight_locator(page, target_link, "click")
                             target_link.click()
                             page.wait_for_load_state("networkidle")
                             self.stop_event.wait(2)
+                            if HIGHLIGHT_ENABLED:
+                                try:
+                                    init_highlight(page)
+                                except Exception:
+                                    pass
                     except Exception as e:
                         log(f"点击 Tab 操作异常: {e}")
 
@@ -1002,6 +1024,9 @@ class OrderScanner:
                         try:
                             scan_stats["row_total"] += 1
                             item_loc = page.locator(current_item_selector)
+                            
+                            if HIGHLIGHT_ENABLED:
+                                highlight_by_selector(page, current_item_selector, "scan", 800)
 
                             merchant_loc = page.locator(merchant_selector)
                             merchant_info = _safe_locator_info(merchant_loc)
@@ -1115,55 +1140,67 @@ class OrderScanner:
                             
                             # Assign
                             try:
-                                assign_btn = item_loc.locator("a").filter(has_text="订单分配")
+                                assign_btn = item_loc.locator("a:has-text('订单分配')").first
                                 assign_btn_label = "订单分配"
 
                                 if assign_btn.count() == 0:
-                                    assign_btn = item_loc.locator("div:nth-child(7) a").filter(has_text="订单分配")
+                                    assign_btn = item_loc.locator("a.bth.btn-primary:has-text('订单分配')").first
 
                                 if assign_btn.count() == 0:
-                                    assign_btn = item_loc.locator("div:nth-child(7) > div > a:nth-child(4)")
+                                    assign_btn = item_loc.locator("a[data-toggle='ajaxModal']:has-text('订单分配')").first
 
                                 if assign_btn.count() == 0:
-                                    assign_btn = item_loc.locator("a").filter(has_text="分配").filter(has_not_text="分配人员")
+                                    assign_btn = item_loc.locator("div:nth-child(7) a").filter(has_text="订单分配").first
+
+                                if assign_btn.count() == 0:
+                                    assign_btn = item_loc.locator("div:nth-child(7) > div > a:nth-child(4)").first
+
+                                if assign_btn.count() == 0:
+                                    assign_btn = item_loc.locator("a:has-text('分配')").filter(has_not_text="分配人员").first
                                     assign_btn_label = "分配"
 
                                 if assign_btn.count() == 0:
-                                    assign_btn = item_loc.locator("div:nth-child(7) a").filter(has_text="分配").filter(has_not_text="分配人员")
+                                    assign_btn = item_loc.locator("div:nth-child(7) a:has-text('分配')").filter(has_not_text="分配人员").first
                                     assign_btn_label = "分配"
 
                                 if assign_btn.count() > 0:
                                     log(f"点击{assign_btn_label}按钮...")
-                                    # Ensure we click the visible one if multiple
-                                    btn_to_click = assign_btn.filter(has=page.locator("visible=true")).first
-                                    if btn_to_click.count() > 0:
+                                    try:
+                                        assign_btn.wait_for(state="visible", timeout=5000)
+                                    except Exception:
+                                        pass
+                                    try:
+                                        assign_btn.scroll_into_view_if_needed(timeout=5000)
+                                    except Exception:
+                                        pass
+                                    if HIGHLIGHT_ENABLED:
                                         try:
-                                            btn_to_click.scroll_into_view_if_needed(timeout=5000)
-                                        except Exception:
-                                            pass
-                                        if HIGHLIGHT_ENABLED:
-                                            highlight_locator(page, btn_to_click, "click")
-                                        try:
-                                            btn_to_click.click(timeout=8000, no_wait_after=True)
-                                        except Exception:
-                                            btn_to_click.click(timeout=8000, force=True, no_wait_after=True)
-                                    else:
-                                        log("找到分配按钮但不加见，尝试强制点击第一个")
-                                        try:
-                                            assign_btn.first.scroll_into_view_if_needed(timeout=5000)
-                                        except Exception:
-                                            pass
-                                        if HIGHLIGHT_ENABLED:
-                                            highlight_locator(page, assign_btn.first, "click")
-                                        try:
-                                            assign_btn.first.click(timeout=8000, no_wait_after=True)
-                                        except Exception:
-                                            assign_btn.first.click(timeout=8000, force=True, no_wait_after=True)
+                                            highlight_locator(page, assign_btn, "click")
+                                        except Exception as e:
+                                            log(f"分配按钮高亮失败: {e}")
+                                    try:
+                                        assign_btn.click(timeout=8000, no_wait_after=True)
+                                    except Exception:
+                                        assign_btn.click(timeout=8000, force=True, no_wait_after=True)
                                     
                                     # Handle Modal
                                     try:
                                         # Wait for modal to appear
                                         page.wait_for_selector("#ajaxModal", state="visible", timeout=10000)
+                                        self.stop_event.wait(0.5)
+                                        if HIGHLIGHT_ENABLED:
+                                            try:
+                                                page.evaluate("""
+                                                    (function() {
+                                                        if (window.__playwrightHighlight) {
+                                                            window.__playwrightHighlight.overlay = null;
+                                                            window.__playwrightHighlight.timer = null;
+                                                        }
+                                                    })();
+                                                """)
+                                                init_highlight(page)
+                                            except Exception as e:
+                                                log(f"弹窗高亮初始化失败: {e}")
                                         modal = page.locator("#ajaxModal").filter(has=page.locator("visible=true")).first
                                         
                                         # Click dropdown

@@ -1,0 +1,17 @@
+services:
+  order-point:
+    build: .
+    container_name: order-point
+    restart: always
+    ports:
+      - "5050:5050"
+      - "5900:5900"
+      - "6080:6080"
+    volumes:
+      - ./config.json:/app/config.json
+      - ./config.local.json:/app/config.local.json
+      - ./records.db:/app/records.db
+      - ./storage_state_order_scanner.json:/app/storage_state_order_scanner.json
+    environment:
+      - TZ=Asia/Shanghai
+      - VNC_PASSWORD=vnc123
