@@ -251,7 +251,7 @@ echo.
 echo    🚀 现在你可以访问：
 echo.
 echo      Web 管理后台:  http://localhost:5050
-echo      noVNC 远程桌面: http://localhost:6080  (密码: vnc123)
+echo      noVNC 远程桌面: http://localhost:6080  (密码: vnc123)   please Copy Password ! ! !
 echo.
 echo    💪 你的自动化订单分配系统已经准备就绪！
 echo       让系统为你自动处理订单，解放双手，高效工作！
