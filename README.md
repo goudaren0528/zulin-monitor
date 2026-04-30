@@ -387,7 +387,7 @@ A: 默认密码为 `vnc123 `docker-compose.local `docker-compose.local.yml` 的 
 **！记住，如果输入密码时提示“密码错误”，请直接复制密码到 `vnc.html` 中，不要使用键盘输入密码。**
 
 ### Q: 如何调试脚本执行过程？
-A: 将 `headless` 设置为 `false`，并启用元素高亮功能。Docker 部署时通过 noVNC（http://localhost:6080）实时查看。
+A: 将 `headless` 设置为 `false`，并启用元素高亮功能。Docker 部署时通过 noVNC http://localhost:6080
 
 ### Q: 商户达到限额后如何处理？
 A: 系统会自动停止向该商户分配订单，可通过 Web 管理后台重置进度。
