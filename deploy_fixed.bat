@@ -204,25 +204,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo.
-echo ============================================================
-echo    部署完成！
-echo ============================================================
-echo.
-echo    服务地址：
-echo      Web 管理后台:  http://localhost:5050
-echo      noVNC 远程桌面: http://localhost:6080  (密码: vnc123)
-echo      VNC 端口:       localhost:5900         (密码: vnc123)
-echo.
-echo    如果通过 UU 远程连接，请将 localhost 替换为服务器的局域网 IP
-echo    例如: http://192.168.x.x:5050
-echo.
-echo    常用命令：
-echo      查看日志:   docker logs -f order-point
-echo      停止服务:   !COMPOSE_CMD! -f "!COMPOSE_FILE!" down
-echo      重启服务:   !COMPOSE_CMD! -f "!COMPOSE_FILE!" restart
-echo      
-echo.
 echo ============================================================
 echo.
 echo.
@@ -246,17 +227,21 @@ echo ============================================================
 echo    🎉 部署成功！🎉
 echo ============================================================
 echo.
-echo    🌟 恭喜你！Order Point 服务已经成功启动！
+echo    恭喜你！Order Point 服务已经成功启动！
 echo.
-echo    🚀 现在你可以访问：
+echo    现在你可以访问：
 echo.
-echo      Web 管理后台:  http://localhost:5050
-echo      noVNC 远程桌面: http://localhost:6080  (密码: vnc123)   please Copy Password ! ! !
+echo     Web 管理后台:  http://localhost:5050
+echo     noVNC 远程桌面: http://localhost:6080  (密码: vnc123) 
+echo.  
+echo    请直接复制密码到 vnc.html ，不要使用键盘输入密码 （Please copy the password, do not type it in ！！！）
 echo.
-echo    💪 你的自动化订单分配系统已经准备就绪！
-echo       让系统为你自动处理订单，解放双手，高效工作！
 echo.
-echo    📝 提示：打开 noVNC 可以实时观看订单扫描过程
+echo    提示：打开 noVNC 可以实时观看订单扫描过程
+echo.
+echo    如果通过 UU 远程连接，请将 localhost 替换为服务器的局域网 IP
+echo    例如: http://192.168.x.x:5050
+echo.
 echo ============================================================
 echo.
 pause
