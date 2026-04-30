@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>综合管理控制台</title>
+    <title>租赁订单监控系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,7 +260,8 @@
 
         /* Log Container */
         .log-container {
-            height: 400px;
+            height: calc(100vh - 380px);
+            min-height: 400px;
             overflow-y: auto;
             background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
             color: #22C55E;
@@ -1937,8 +1938,51 @@
             const logContainer = document.getElementById(prefix + '-log-container');
             const isAutoScroll = document.getElementById(prefix + 'AutoScroll').checked;
 
-            // Only update if content changed to avoid flickering/performance issues
-            const newContent = data.logs.join('<br>');
+            const coloredLogs = data.logs.map(line => {
+                if (line.includes('[调试]')) {
+                    return '<span style="color:#64748B;font-size:12px;">' + line + '</span>';
+                } else if (line.includes('[!]') || line.includes('[警告]')) {
+                    return '<span style="color:#F59E0B;">' + line + '</span>';
+                } else if (line.includes('[错误]')) {
+                    return '<span style="color:#EF4444;font-weight:bold;">' + line + '</span>';
+                } else if (line.includes('[扫描]')) {
+                    return '<span style="color:#06B6D4;font-weight:bold;">' + line + '</span>';
+                } else if (line.includes('[命中]')) {
+                    return '<span style="color:#22D3EE;font-weight:bold;">' + line + '</span>';
+                } else if (line.includes('[详情]')) {
+                    return '<span style="color:#38BDF8;">' + line + '</span>';
+                } else if (line.includes('[分配]')) {
+                    return '<span style="color:#FBBF24;">' + line + '</span>';
+                } else if (line.includes('[统计]')) {
+                    return '<span style="color:#A78BFA;">' + line + '</span>';
+                } else if (line.includes('[通知]')) {
+                    return '<span style="color:#34D399;">' + line + '</span>';
+                } else if (line.includes('[完成]')) {
+                    return '<span style="color:#2DD4BF;">' + line + '</span>';
+                } else if (line.includes('[等待]')) {
+                    return '<span style="color:#94A3B8;">' + line + '</span>';
+                } else if (line.includes('[操作]')) {
+                    return '<span style="color:#60A5FA;">' + line + '</span>';
+                } else if (line.includes('[检查]')) {
+                    return '<span style="color:#818CF8;">' + line + '</span>';
+                } else if (line.includes('[页面]')) {
+                    return '<span style="color:#67E8F9;">' + line + '</span>';
+                } else if (line.includes('[导航]')) {
+                    return '<span style="color:#C084FC;">' + line + '</span>';
+                } else if (line.includes('[登录]')) {
+                    return '<span style="color:#FB923C;">' + line + '</span>';
+                } else if (line.includes('[系统]')) {
+                    return '<span style="color:#CBD5E1;">' + line + '</span>';
+                } else if (line.includes('[高亮]')) {
+                    return '<span style="color:#F472B6;">' + line + '</span>';
+                } else if (line.includes('[风控]')) {
+                    return '<span style="color:#FB7185;">' + line + '</span>';
+                } else if (line.includes('[RPA]')) {
+                    return '<span style="color:#A78BFA;">' + line + '</span>';
+                }
+                return line;
+            });
+            const newContent = coloredLogs.join('<br>');
             if (logContainer.innerHTML !== newContent) {
                 logContainer.innerHTML = newContent;
                 if (isAutoScroll) {
