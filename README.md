@@ -4,7 +4,7 @@
 
 ## 安装
 
-### 方式一：Docker 部署（推荐）
+### 方式一：Docker 部署（最最推荐）
 
 #### 前提条件
 - 已安装 [Docker Desktop](https://www.docker.com/products/docker-desktop/) 并运行
@@ -38,11 +38,47 @@ environment:
   - VNC_PASSWORD=vnc123
 ```
 
-修改后需要重新构建并启动：
+修改后请重新运行脚本
+或使用docker命令重新构建并启动（命令如下）：
 
 ```bash
 docker compose -f docker-compose.local.yml up -d --build
 ```
+
+## 访问地址
+
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| Web 管理后台 | http://localhost:5050 | 配置管理、日志查看 |
+| noVNC 远程桌面 | http://localhost:6080 | 实时查看浏览器操作（密码: vnc123） |
+| VNC 端口 | localhost:5900 | VNC 客户端连接（密码: vnc123） |
+
+## 项目结构
+
+```
+zulin-monitor/
+├── app.py                          # Flask Web 管理后台
+├── main.py                         # 订单扫描器核心模块
+├── monitor.py                      # 接口监控模块
+├── sync_orders.py                  # 订单同步模块
+├── db.py                           # 数据库操作模块
+├── highlight_helper.py             # Playwright 元素高亮辅助模块
+├── config.json                     # 基础配置文件
+├── config.local.json               # 本地覆盖配置（优先级更高）
+├── config.example.json             # 配置示例文件
+├── requirements.txt                # Python 依赖
+├── records.db                      # SQLite 数据库文件
+├── storage_state_order_scanner.json # Playwright 登录状态文件
+├── Dockerfile                      # Docker 镜像构建文件
+├── docker-compose.yml              # Docker Compose 配置（含 Traefik）
+├── docker-compose.local.yml        # Docker Compose 本地配置（无 Traefik）
+├── deploy_fixed.bat                # 一键部署脚本（Windows）
+├── manage.bat                      # 服务管理脚本（Windows）
+├── templates/                      # HTML 模板
+├── tests/                          # 测试文件
+└── docs/                           # 文档目录
+```
+
 ## 功能特性
 
 ### 1. 订单自动分配（main.py）
@@ -90,31 +126,7 @@ docker compose -f docker-compose.local.yml up -d --build
 - **容器化**: Docker + docker-compose
 - **远程桌面**: Xvfb + x11vnc + noVNC
 
-## 项目结构
 
-```
-zulin-monitor/
-├── app.py                          # Flask Web 管理后台
-├── main.py                         # 订单扫描器核心模块
-├── monitor.py                      # 接口监控模块
-├── sync_orders.py                  # 订单同步模块
-├── db.py                           # 数据库操作模块
-├── highlight_helper.py             # Playwright 元素高亮辅助模块
-├── config.json                     # 基础配置文件
-├── config.local.json               # 本地覆盖配置（优先级更高）
-├── config.example.json             # 配置示例文件
-├── requirements.txt                # Python 依赖
-├── records.db                      # SQLite 数据库文件
-├── storage_state_order_scanner.json # Playwright 登录状态文件
-├── Dockerfile                      # Docker 镜像构建文件
-├── docker-compose.yml              # Docker Compose 配置（含 Traefik）
-├── docker-compose.local.yml        # Docker Compose 本地配置（无 Traefik）
-├── deploy_fixed.bat                # 一键部署脚本（Windows）
-├── manage.bat                      # 服务管理脚本（Windows）
-├── templates/                      # HTML 模板
-├── tests/                          # 测试文件
-└── docs/                           # 文档目录
-```
 
 
 ## 安装方式二
@@ -164,13 +176,6 @@ copy config.example.json config.local.json
 - Webhook 通知地址
 - 扫描间隔时间
 
-## 访问地址
-
-| 服务 | 地址 | 说明 |
-|------|------|------|
-| Web 管理后台 | http://localhost:5050 | 配置管理、日志查看 |
-| noVNC 远程桌面 | http://localhost:6080 | 实时查看浏览器操作（密码: vnc123） |
-| VNC 端口 | localhost:5900 | VNC 客户端连接（密码: vnc123） |
 
 > 如果通过远程连接，请将 `localhost` 替换为服务器的局域网 IP，例如 `http://192.168.x.x:5050`
 
