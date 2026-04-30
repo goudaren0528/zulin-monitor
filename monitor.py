@@ -5,6 +5,7 @@ import os
 import threading
 import re
 from playwright.sync_api import sync_playwright
+from highlight_helper import init_highlight, highlight_locator, highlight_by_selector, HIGHLIGHT_ENABLED
 
 # Global log buffer for Monitor
 MONITOR_LOG_BUFFER = []
@@ -117,6 +118,13 @@ class InterfaceMonitor:
                 context = browser.new_context()
                 page = context.new_page()
 
+                if HIGHLIGHT_ENABLED:
+                    try:
+                        init_highlight(page)
+                        monitor_log("元素高亮功能已初始化")
+                    except Exception as e:
+                        monitor_log(f"元素高亮功能初始化失败: {e}")
+
                 # Reuse login logic (accessing target_url directly might redirect to login)
                 monitor_log(f"正在访问: {target_url}")
                 try:
@@ -134,8 +142,14 @@ class InterfaceMonitor:
                             # Check if login form exists
                             if p_page.locator(user_selector).count() > 0:
                                 monitor_log("检测到登录页面，开始自动登录...")
+                                if HIGHLIGHT_ENABLED:
+                                    highlight_by_selector(p_page, user_selector, "focus: input")
                                 p_page.fill(user_selector, username)
+                                if HIGHLIGHT_ENABLED:
+                                    highlight_by_selector(p_page, pass_selector, "focus: input")
                                 p_page.fill(pass_selector, password)
+                                if HIGHLIGHT_ENABLED:
+                                    highlight_by_selector(p_page, pass_selector, "press: Enter")
                                 p_page.press(pass_selector, "Enter")
                                 p_page.wait_for_load_state("networkidle")
                                 monitor_log("登录操作完成，正在跳转到目标页面...")
