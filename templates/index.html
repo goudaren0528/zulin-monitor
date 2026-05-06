@@ -1437,7 +1437,6 @@
                                     <small class="text-muted">添加后可在关键词映射中分配订单</small>
                                 </div>
                                 <div id="merchant-limits-container" class="merchant-limits-grid">
-                                    <div class="text-center py-4 text-muted">加载中...</div>
                                 </div>
                                 <div class="d-flex gap-2 mt-3">
                                     <button onclick="loadMerchantLimits()" class="btn btn-outline-secondary btn-sm">
@@ -2911,6 +2910,10 @@
 
         // Merchant Limits Management
         function loadMerchantLimits() {
+            const container = document.getElementById('merchant-limits-container');
+            if (container) {
+                container.innerHTML = '<div class="text-center py-4 text-muted">加载中...</div>';
+            }
             fetch('/api/merchants/limits')
                 .then(response => response.json())
                 .then(data => {
@@ -3135,9 +3138,14 @@
 
         // Initialize merchant limits on accordion show
         document.addEventListener('DOMContentLoaded', function() {
-            const accordionBtn = document.querySelector('[data-bs-target="#collapseMerchantLimits"]');
-            if (accordionBtn) {
-                accordionBtn.addEventListener('shown.bs.collapse', loadMerchantLimits);
+            const collapseEl = document.getElementById('collapseMerchantLimits');
+            if (collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', function() {
+                    const container = document.getElementById('merchant-limits-container');
+                    if (!container.children.length || container.querySelector('.text-muted')) {
+                        loadMerchantLimits();
+                    }
+                });
             }
         });
 
