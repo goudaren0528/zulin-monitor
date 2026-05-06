@@ -567,12 +567,11 @@ def add_merchant():
     if existing_config:
         return jsonify({'status': 'error', 'message': '商户已存在'}), 400
 
-    # 创建记录 (初始限额9999即不限制, 可后续修改)
-    set_merchant_config(merchant=merchant, limit_value=9999, webhook_urls=[])
+    set_merchant_config(merchant=merchant, limit_value=0, webhook_urls=[])
 
     return jsonify({
         'status': 'success',
-        'message': f'已添加商户 {merchant}（限额9999即不限制，请按需修改）'
+        'message': f'已添加商户 {merchant}（不限额，请按需修改）'
     })
 
 # --- Data Management API ---
