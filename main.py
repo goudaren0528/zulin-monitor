@@ -1014,7 +1014,7 @@ class OrderScanner:
                             log("点击待审核 Tab", category="action")
                             if HIGHLIGHT_ENABLED:
                                 highlight_locator(page, target_link, "click")
-                            target_link.click()
+                            target_link.click(force=True)
                             page.wait_for_load_state("networkidle")
                             self.stop_event.wait(2)
                             if HIGHLIGHT_ENABLED:
