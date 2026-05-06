@@ -315,8 +315,7 @@ def get_all_merchant_configs(db_path=None):
             "webhook_urls": webhook_urls,
             "current_count": current_count,
             "last_reset_at": last_reset_at,
-            # 限额为 0 表示禁用分配，>0 时检查是否达到限额
-            "is_at_limit": limit_value == 0 or (limit_value > 0 and current_count >= limit_value)
+            "is_at_limit": limit_value > 0 and current_count >= limit_value
         })
     return results
 

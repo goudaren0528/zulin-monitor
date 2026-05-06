@@ -402,7 +402,7 @@ def handle_merchant_limits():
                     'webhook_urls': [],
                     'current_count': 0,
                     'last_reset_at': '',
-                    'is_at_limit': True  # 限额为 0 表示禁用分配
+                    'is_at_limit': False
                 })
 
         return jsonify({'merchants': limits})
@@ -567,12 +567,12 @@ def add_merchant():
     if existing_config:
         return jsonify({'status': 'error', 'message': '商户已存在'}), 400
 
-    # 在数据库中创建记录（初始限额为0，无webhook）
-    set_merchant_config(merchant=merchant, limit_value=0, webhook_urls=[])
+    # 创建记录 (初始限额9999即不限制, 可后续修改)
+    set_merchant_config(merchant=merchant, limit_value=9999, webhook_urls=[])
 
     return jsonify({
         'status': 'success',
-        'message': f'已添加商户 {merchant}（默认限额为0，暂不参与分配），请设置限额并配置关键词映射'
+        'message': f'已添加商户 {merchant}（限额9999即不限制，请按需修改）'
     })
 
 # --- Data Management API ---
