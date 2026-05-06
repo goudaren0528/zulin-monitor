@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>综合管理控制台</title>
+    <title>租赁订单监控系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,15 +260,17 @@
 
         /* Log Container */
         .log-container {
-            height: 400px;
+            height: calc(100vh - 440px);
+            min-height: 300px;
             overflow-y: auto;
             background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
-            color: #22C55E;
-            font-family: 'Fira Sans', monospace;
-            font-size: 13px;
-            padding: 16px;
-            border-radius: 8px;
-            line-height: 1.6;
+            color: #94A3B8;
+            font-family: 'Fira Sans', 'Consolas', 'Monaco', monospace;
+            font-size: 12.5px;
+            padding: 12px;
+            border-radius: 0 0 12px 12px;
+            line-height: 1.7;
+            scroll-behavior: smooth;
         }
 
         .log-container::-webkit-scrollbar {
@@ -287,6 +289,92 @@
 
         .log-container::-webkit-scrollbar-thumb:hover {
             background: #64748B;
+        }
+
+        /* Log Toolbar */
+        .log-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #1E293B;
+            border-top: 1px solid #334155;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .log-toolbar .log-filter-group {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .log-toolbar .log-filter-btn {
+            padding: 2px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #1E293B;
+            color: #94A3B8;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: 'Fira Sans', sans-serif;
+            line-height: 1.4;
+        }
+
+        .log-toolbar .log-filter-btn:hover {
+            background: #334155;
+            color: #E2E8F0;
+        }
+
+        .log-toolbar .log-filter-btn.active {
+            border-color: var(--color-primary);
+            background: rgba(37, 99, 235, 0.15);
+            color: #93C5FD;
+        }
+
+        .log-toolbar .log-search {
+            width: 120px;
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #0F172A;
+            color: #E2E8F0;
+            font-family: 'Fira Sans', sans-serif;
+            transition: border-color 0.15s;
+        }
+
+        .log-toolbar .log-search:focus {
+            outline: none;
+            border-color: var(--color-primary);
+        }
+
+        .log-toolbar .log-search::placeholder {
+            color: #64748B;
+        }
+
+        .log-toolbar .log-clear-btn {
+            padding: 3px 8px;
+            font-size: 11px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #1E293B;
+            color: #94A3B8;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            font-family: 'Fira Sans', sans-serif;
+        }
+
+        .log-toolbar .log-clear-btn:hover {
+            background: #7F1D1D;
+            border-color: #DC2626;
+            color: #FCA5A5;
+        }
+
+        .log-line {
+            white-space: pre-wrap;
+            word-break: break-all;
         }
 
         /* Form Elements */
@@ -1086,6 +1174,17 @@
                         </div>
                     </div>
                     <div class="card-body p-0">
+                        <div class="log-toolbar" id="order-log-toolbar">
+                            <div class="log-filter-group">
+                                <button class="log-filter-btn active" data-prefix="order" data-level="all">全部</button>
+                                <button class="log-filter-btn" data-prefix="order" data-level="info">信息</button>
+                                <button class="log-filter-btn" data-prefix="order" data-level="debug">调试</button>
+                                <button class="log-filter-btn" data-prefix="order" data-level="warn">警告</button>
+                                <button class="log-filter-btn" data-prefix="order" data-level="error">错误</button>
+                            </div>
+                            <input type="text" class="log-search" id="order-log-search" placeholder="搜索日志...">
+                            <button class="log-clear-btn" id="order-log-clear">清除</button>
+                        </div>
                         <div id="order-log-container" class="log-container" role="log" aria-live="polite">正在获取日志...</div>
                     </div>
                 </div>
@@ -1136,6 +1235,17 @@
                         </div>
                     </div>
                     <div class="card-body p-0">
+                        <div class="log-toolbar" id="monitor-log-toolbar">
+                            <div class="log-filter-group">
+                                <button class="log-filter-btn active" data-prefix="monitor" data-level="all">全部</button>
+                                <button class="log-filter-btn" data-prefix="monitor" data-level="info">信息</button>
+                                <button class="log-filter-btn" data-prefix="monitor" data-level="debug">调试</button>
+                                <button class="log-filter-btn" data-prefix="monitor" data-level="warn">警告</button>
+                                <button class="log-filter-btn" data-prefix="monitor" data-level="error">错误</button>
+                            </div>
+                            <input type="text" class="log-search" id="monitor-log-search" placeholder="搜索日志...">
+                            <button class="log-clear-btn" id="monitor-log-clear">清除</button>
+                        </div>
                         <div id="monitor-log-container" class="log-container" role="log" aria-live="polite">正在获取日志...</div>
                     </div>
                 </div>
@@ -1327,7 +1437,6 @@
                                     <small class="text-muted">添加后可在关键词映射中分配订单</small>
                                 </div>
                                 <div id="merchant-limits-container" class="merchant-limits-grid">
-                                    <div class="text-center py-4 text-muted">加载中...</div>
                                 </div>
                                 <div class="d-flex gap-2 mt-3">
                                     <button onclick="loadMerchantLimits()" class="btn btn-outline-secondary btn-sm">
@@ -1933,12 +2042,77 @@
                 text.style.color = '#EF4444';
             }
 
-            // Update logs
+            // Store raw logs for filtering
+            window['_rawLogs_' + prefix] = data.logs;
+            renderLogs(prefix);
+        }
+
+        function getLogLevel(line) {
+            if (line.includes('[调试]')) return 'debug';
+            if (line.includes('[警告]')) return 'warn';
+            if (line.includes('[错误]')) return 'error';
+            return 'info';
+        }
+
+        function getLogColor(line) {
+            if (line.includes('[调试]')) return '#64748B';
+            if (line.includes('[警告]')) return '#F59E0B';
+            if (line.includes('[错误]')) return '#EF4444';
+            if (line.includes('[扫描]')) return '#06B6D4';
+            if (line.includes('[命中]')) return '#22D3EE';
+            if (line.includes('[详情]')) return '#38BDF8';
+            if (line.includes('[分配]')) return '#FBBF24';
+            if (line.includes('[统计]')) return '#A78BFA';
+            if (line.includes('[通知]')) return '#34D399';
+            if (line.includes('[完成]')) return '#2DD4BF';
+            if (line.includes('[等待]')) return '#94A3B8';
+            if (line.includes('[操作]')) return '#60A5FA';
+            if (line.includes('[检查]')) return '#818CF8';
+            if (line.includes('[页面]')) return '#67E8F9';
+            if (line.includes('[导航]')) return '#C084FC';
+            if (line.includes('[登录]')) return '#FB923C';
+            if (line.includes('[系统]')) return '#CBD5E1';
+            if (line.includes('[高亮]')) return '#F472B6';
+            if (line.includes('[风控]')) return '#FB7185';
+            if (line.includes('[RPA]')) return '#A78BFA';
+            return '#94A3B8';
+        }
+
+        function getLogFontWeight(line) {
+            if (line.includes('[错误]') || line.includes('[扫描]') || line.includes('[命中]') || line.includes('[分配]') || line.includes('[完成]')) return 'bold';
+            return 'normal';
+        }
+
+        function getLogFontSize(line) {
+            if (line.includes('[调试]')) return '12px';
+            return '';
+        }
+
+        function renderLogs(prefix) {
             const logContainer = document.getElementById(prefix + '-log-container');
             const isAutoScroll = document.getElementById(prefix + 'AutoScroll').checked;
+            const activeFilter = window['_logFilter_' + prefix] || 'all';
+            const searchText = (window['_logSearch_' + prefix] || '').toLowerCase();
+            const rawLogs = window['_rawLogs_' + prefix] || [];
 
-            // Only update if content changed to avoid flickering/performance issues
-            const newContent = data.logs.join('<br>');
+            const filteredLogs = rawLogs.filter(line => {
+                if (activeFilter !== 'all' && getLogLevel(line) !== activeFilter) return false;
+                if (searchText && !line.toLowerCase().includes(searchText)) return false;
+                return true;
+            });
+
+            const coloredLines = filteredLogs.map(line => {
+                const color = getLogColor(line);
+                const weight = getLogFontWeight(line);
+                const size = getLogFontSize(line);
+                const escapedLine = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                let style = `color:${color}`;
+                if (weight === 'bold') style += ';font-weight:bold';
+                if (size) style += `;font-size:${size}`;
+                return `<span class="log-line" style="${style}">${escapedLine}</span>`;
+            });
+
+            const newContent = coloredLines.join('<br>');
             if (logContainer.innerHTML !== newContent) {
                 logContainer.innerHTML = newContent;
                 if (isAutoScroll) {
@@ -1959,6 +2133,35 @@
                 updateAllStatus();
             });
         }
+
+        // ========== Log Toolbar Functions ==========
+        document.querySelectorAll('.log-filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const prefix = this.dataset.prefix;
+                const level = this.dataset.level;
+                window['_logFilter_' + prefix] = level;
+                this.closest('.log-filter-group').querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                renderLogs(prefix);
+            });
+        });
+
+        document.querySelectorAll('.log-search').forEach(input => {
+            input.addEventListener('input', function() {
+                const prefix = this.id.startsWith('order') ? 'order' : 'monitor';
+                window['_logSearch_' + prefix] = this.value;
+                renderLogs(prefix);
+            });
+        });
+
+        document.querySelectorAll('.log-clear-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const prefix = this.id.startsWith('order') ? 'order' : 'monitor';
+                const logContainer = document.getElementById(prefix + '-log-container');
+                logContainer.innerHTML = '';
+                window['_rawLogs_' + prefix] = [];
+            });
+        });
 
         // ========== Config Section Functions ==========
 
@@ -2707,6 +2910,10 @@
 
         // Merchant Limits Management
         function loadMerchantLimits() {
+            const container = document.getElementById('merchant-limits-container');
+            if (container) {
+                container.innerHTML = '<div class="text-center py-4 text-muted">加载中...</div>';
+            }
             fetch('/api/merchants/limits')
                 .then(response => response.json())
                 .then(data => {
@@ -2931,9 +3138,14 @@
 
         // Initialize merchant limits on accordion show
         document.addEventListener('DOMContentLoaded', function() {
-            const accordionBtn = document.querySelector('[data-bs-target="#collapseMerchantLimits"]');
-            if (accordionBtn) {
-                accordionBtn.addEventListener('shown.bs.collapse', loadMerchantLimits);
+            const collapseEl = document.getElementById('collapseMerchantLimits');
+            if (collapseEl) {
+                collapseEl.addEventListener('show.bs.collapse', function() {
+                    const container = document.getElementById('merchant-limits-container');
+                    if (!container.children.length || container.querySelector('.text-muted')) {
+                        loadMerchantLimits();
+                    }
+                });
             }
         });
 
