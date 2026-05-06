@@ -125,7 +125,6 @@ def init_merchant_config_table(db_path=None):
 
             # 如果有 webhook_url 列但没有 webhook_urls，需要迁移
             if 'webhook_url' in columns and 'webhook_urls' not in columns:
-                # 创建新表
                 cursor.execute("""
                     CREATE TABLE merchant_config_new (
                         merchant TEXT PRIMARY KEY NOT NULL,
@@ -135,7 +134,6 @@ def init_merchant_config_table(db_path=None):
                         updated_at TEXT
                     )
                 """)
-                # 迁移数据，把单个 webhook_url 转成 JSON 数组
                 cursor.execute("SELECT merchant, limit_value, webhook_url, last_reset_at, updated_at FROM merchant_config")
                 rows = cursor.fetchall()
                 for row in rows:
@@ -145,15 +143,11 @@ def init_merchant_config_table(db_path=None):
                         INSERT INTO merchant_config_new (merchant, limit_value, webhook_urls, last_reset_at, updated_at)
                         VALUES (?, ?, ?, ?, ?)
                     """, (merchant, limit_value, webhook_urls_json, last_reset_at, updated_at))
-                # 删除旧表，重命名新表
                 cursor.execute("DROP TABLE merchant_config")
                 cursor.execute("ALTER TABLE merchant_config_new RENAME TO merchant_config")
-            # 如果已经有 webhook_urls 列，无需迁移
         else:
-            # 检查是否有旧的 merchant_limits 表需要迁移
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='merchant_limits'")
             if cursor.fetchone():
-                # 创建新表
                 cursor.execute("""
                     CREATE TABLE merchant_config (
                         merchant TEXT PRIMARY KEY NOT NULL,
@@ -163,14 +157,12 @@ def init_merchant_config_table(db_path=None):
                         updated_at TEXT
                     )
                 """)
-                # 迁移数据
                 cursor.execute("""
                     INSERT INTO merchant_config (merchant, limit_value, last_reset_at, updated_at)
                     SELECT merchant, limit_value, last_reset_at, updated_at FROM merchant_limits
                 """)
                 cursor.execute("DROP TABLE merchant_limits")
             else:
-                # 直接创建新表
                 cursor.execute("""
                     CREATE TABLE merchant_config (
                         merchant TEXT PRIMARY KEY NOT NULL,
@@ -181,6 +173,64 @@ def init_merchant_config_table(db_path=None):
                     )
                 """)
 
+        conn.commit()
+        conn.close()
+
+    init_weight_router_table(db_path)
+
+
+def init_weight_router_table(db_path=None):
+    if db_path is None:
+        db_path = DB_PATH
+
+    with db_lock:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS weight_router (
+                keyword_entry TEXT PRIMARY KEY NOT NULL,
+                current_index INTEGER NOT NULL DEFAULT 0,
+                updated_at TEXT
+            )
+        """)
+        conn.commit()
+        conn.close()
+
+
+def load_weight_router(db_path=None):
+    if db_path is None:
+        db_path = DB_PATH
+
+    if not os.path.exists(db_path):
+        return {}
+
+    with db_lock:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT keyword_entry, current_index FROM weight_router")
+        rows = cursor.fetchall()
+        conn.close()
+
+    return {row[0]: row[1] for row in rows}
+
+
+def save_weight_router_index(db_path=None, keyword_entry=None, current_index=0):
+    if db_path is None:
+        db_path = DB_PATH
+
+    if not keyword_entry:
+        return
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with db_lock:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO weight_router (keyword_entry, current_index, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(keyword_entry) DO UPDATE SET current_index=?, updated_at=?
+        """, (keyword_entry, current_index, now, current_index, now))
         conn.commit()
         conn.close()
 

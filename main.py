@@ -5,7 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
-from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks
+from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks, load_weight_router, save_weight_router_index
 from highlight_helper import init_highlight, highlight_locator, highlight_by_selector, HIGHLIGHT_ENABLED
 
 # Try importing Windows-specific libraries safely
@@ -333,10 +333,13 @@ class OrderScanner:
         self.running = False
         self.thread = None
         self.stop_event = threading.Event()
-        self._weight_router = {}  # 存储每个关键词的轮询索引
+        self._weight_router = {}
         self.load_config()
-        # 初始化数据库
         init_db()
+        self._weight_router = load_weight_router()
+        loaded_count = len(self._weight_router)
+        if loaded_count > 0:
+            log(f"已从数据库加载 {loaded_count} 个轮询记录", category="system")
 
     def load_config(self):
         candidates = ["config.local.json", "config.json"]
@@ -376,10 +379,8 @@ class OrderScanner:
         if not merchant_list:
             return ("米奇租赁官方", "默认规则")
 
-        # 获取已达到限额的商户
         excluded_merchants = set(get_merchants_at_limit())
 
-        # 过滤掉已达到限额的商户
         available_merchants = [
             m for m in merchant_list
             if m.get("merchant") not in excluded_merchants
@@ -389,7 +390,6 @@ class OrderScanner:
             log("所有商户均已达到限额，使用默认商户", category="assign")
             return ("米奇租赁官方", "所有商户限额已满")
 
-        # 记录被排除的商户
         original_names = {m.get("merchant") for m in merchant_list}
         excluded_names = original_names & excluded_merchants
         if excluded_names:
@@ -399,26 +399,28 @@ class OrderScanner:
         if not sequence:
             return ("米奇租赁官方", "默认规则")
 
-        # 获取或初始化轮询索引
         if keyword not in self._weight_router:
             self._weight_router[keyword] = 0
 
         idx = self._weight_router[keyword]
         selected_merchant = sequence[idx % len(sequence)]
 
-        # 更新索引
-        self._weight_router[keyword] = (idx + 1) % len(sequence)
+        next_idx = (idx + 1) % len(sequence)
+        next_merchant = sequence[next_idx]
+        self._weight_router[keyword] = next_idx
 
-        # 构建轮询信息
+        save_weight_router_index(keyword_entry=keyword, current_index=next_idx)
+
         current_pos = idx % len(sequence) + 1
         total_pos = len(sequence)
 
-        # 计算权重比例字符串
         weight_ratio = ":".join([str(item.get("weight", 1)) for item in available_merchants])
 
-        round_info = f"轮询: {current_pos}/{total_pos}"
+        round_info = f"轮询 {current_pos}/{total_pos}"
         if current_pos == 1:
-            round_info += f", 权重比 {weight_ratio}"
+            round_info += f" 权重{weight_ratio}"
+
+        log(f"当前: {selected_merchant} | 下一个: {next_merchant}", category="assign")
 
         return (selected_merchant, round_info)
 
