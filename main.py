@@ -5,7 +5,7 @@ import os
 import threading
 import sys
 from playwright.sync_api import sync_playwright
-from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks
+from db import record_assignment, init_db, get_merchants_at_limit, get_merchant_webhooks, load_weight_router, save_weight_router_index
 from highlight_helper import init_highlight, highlight_locator, highlight_by_selector, HIGHLIGHT_ENABLED
 
 # Try importing Windows-specific libraries safely
@@ -25,9 +25,39 @@ except ImportError:
 LOG_BUFFER = []
 MAX_LOG_SIZE = 500
 
-def log(message):
-    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-    formatted_msg = f"[{timestamp}] {message}"
+LOG_CATEGORIES = {
+    "scan": "[扫描]",
+    "hit": "[命中]",
+    "detail": "[详情]",
+    "assign": "[分配]",
+    "stats": "[统计]",
+    "notify": "[通知]",
+    "nav": "[导航]",
+    "login": "[登录]",
+    "system": "[系统]",
+    "page": "[页面]",
+    "action": "[操作]",
+    "wait": "[等待]",
+    "check": "[检查]",
+    "highlight": "[高亮]",
+    "risk": "[风控]",
+    "rpa": "[RPA]",
+    "done": "[完成]",
+}
+
+def log(message, level="info", category=None):
+    timestamp = time.strftime('%H:%M:%S')
+    prefix = ""
+    if category and category in LOG_CATEGORIES:
+        prefix = LOG_CATEGORIES[category]
+    if level == "debug":
+        formatted_msg = f"[{timestamp}] [调试] {prefix} {message}" if prefix else f"[{timestamp}] [调试] {message}"
+    elif level == "warn":
+        formatted_msg = f"[{timestamp}] [警告] {prefix} {message}" if prefix else f"[{timestamp}] [警告] {message}"
+    elif level == "error":
+        formatted_msg = f"[{timestamp}] [错误] {prefix} {message}" if prefix else f"[{timestamp}] [错误] {message}"
+    else:
+        formatted_msg = f"[{timestamp}] {prefix} {message}" if prefix else f"[{timestamp}] {message}"
     print(formatted_msg)
     LOG_BUFFER.append(formatted_msg)
     if len(LOG_BUFFER) > MAX_LOG_SIZE:
@@ -303,10 +333,13 @@ class OrderScanner:
         self.running = False
         self.thread = None
         self.stop_event = threading.Event()
-        self._weight_router = {}  # 存储每个关键词的轮询索引
+        self._weight_router = {}
         self.load_config()
-        # 初始化数据库
         init_db()
+        self._weight_router = load_weight_router()
+        loaded_count = len(self._weight_router)
+        if loaded_count > 0:
+            log(f"已从数据库加载 {loaded_count} 个轮询记录", category="system")
 
     def load_config(self):
         candidates = ["config.local.json", "config.json"]
@@ -316,11 +349,11 @@ class OrderScanner:
                 config_path = pth
                 break
         if not config_path:
-            log("错误: 找不到配置文件 config.local.json 或 config.json")
+            log("找不到配置文件 config.local.json 或 config.json", level="error")
             return False
         
         try:
-            log(f"使用配置文件: {config_path}")
+            log(f"使用配置文件: {config_path}", category="system")
             with open(config_path, 'r', encoding='utf-8') as f:
                 raw_config = json.load(f)
             
@@ -329,10 +362,10 @@ class OrderScanner:
             order_config = raw_config.get("order_scanner", {})
             self.config = {**common_config, **order_config}
             
-            log("配置已加载")
+            log("配置已加载", category="system")
             return True
         except Exception as e:
-            log(f"读取配置文件失败: {e}")
+            log(f"读取配置文件失败: {e}", level="error")
             return False
 
     def get_config(self, key, default=None):
@@ -346,55 +379,54 @@ class OrderScanner:
         if not merchant_list:
             return ("米奇租赁官方", "默认规则")
 
-        # 获取已达到限额的商户
         excluded_merchants = set(get_merchants_at_limit())
 
-        # 过滤掉已达到限额的商户
         available_merchants = [
             m for m in merchant_list
             if m.get("merchant") not in excluded_merchants
         ]
 
         if not available_merchants:
-            log(f"所有商户均已达到限额，使用默认商户")
+            log("所有商户均已达到限额，使用默认商户", category="assign")
             return ("米奇租赁官方", "所有商户限额已满")
 
-        # 记录被排除的商户
         original_names = {m.get("merchant") for m in merchant_list}
         excluded_names = original_names & excluded_merchants
         if excluded_names:
-            log(f"排除限额商户: {list(excluded_names)}")
+            log(f"排除限额商户: {list(excluded_names)}", category="assign")
 
         sequence = _build_weight_sequence(available_merchants)
         if not sequence:
             return ("米奇租赁官方", "默认规则")
 
-        # 获取或初始化轮询索引
         if keyword not in self._weight_router:
             self._weight_router[keyword] = 0
 
         idx = self._weight_router[keyword]
         selected_merchant = sequence[idx % len(sequence)]
 
-        # 更新索引
-        self._weight_router[keyword] = (idx + 1) % len(sequence)
+        next_idx = (idx + 1) % len(sequence)
+        next_merchant = sequence[next_idx]
+        self._weight_router[keyword] = next_idx
 
-        # 构建轮询信息
+        save_weight_router_index(keyword_entry=keyword, current_index=next_idx)
+
         current_pos = idx % len(sequence) + 1
         total_pos = len(sequence)
 
-        # 计算权重比例字符串
         weight_ratio = ":".join([str(item.get("weight", 1)) for item in available_merchants])
 
-        round_info = f"轮询: {current_pos}/{total_pos}"
+        round_info = f"轮询 {current_pos}/{total_pos}"
         if current_pos == 1:
-            round_info += f", 权重比 {weight_ratio}"
+            round_info += f" 权重{weight_ratio}"
+
+        log(f"当前: {selected_merchant} | 下一个: {next_merchant}", category="assign")
 
         return (selected_merchant, round_info)
 
     def start(self):
         if self.running:
-            log("服务已经在运行中...")
+            log("服务已经在运行中", category="system")
             return
         
         # Reload config before starting
@@ -404,14 +436,14 @@ class OrderScanner:
         self.thread = threading.Thread(target=self._run_loop, name="OrderScannerThread")
         self.thread.daemon = True
         self.thread.start()
-        log("服务启动中...")
+        log("服务启动中", category="system")
 
     def stop(self):
         if not self.running:
-            log("服务未运行")
+            log("服务未运行", category="system")
             return
         
-        log("正在停止服务...")
+        log("正在停止服务...", category="system")
         self.stop_event.set()
         if self.thread and self.thread.is_alive():
             try:
@@ -433,7 +465,7 @@ class OrderScanner:
 
         # 1. 商户专属 Webhook 通知（支持多个）
         merchant_webhooks = get_merchant_webhooks(merchant=assigned_to)
-        log(f"-> [调试] 商户 {assigned_to} 专属 webhooks: {merchant_webhooks}")
+        log(f"商户 {assigned_to} 专属 webhooks: {merchant_webhooks}", level="debug")
         for webhook_url in merchant_webhooks:
             if not webhook_url:
                 continue
@@ -446,9 +478,9 @@ class OrderScanner:
                     }
                 }
                 resp = requests.post(webhook_url, json=payload)
-                log(f"-> 商户专属 Webhook 已发送至 [{webhook_url[-20:]}...]，状态码: {resp.status_code}")
+                log(f"商户专属 Webhook 已发送 [{webhook_url[-20:]}...] 状态码={resp.status_code}", category="notify")
             except Exception as e:
-                log(f"-> 商户专属 Webhook 发送失败: {e}")
+                log(f"商户专属 Webhook 发送失败: {e}", level="warn", category="notify")
 
         # 2. 全局 Webhook 配置通知（同时发送）
         if webhook_configs:
@@ -469,22 +501,21 @@ class OrderScanner:
                             }
                         }
                         resp = requests.post(webhook_url, json=payload)
-                        log(f"-> Webhook 通知已发送至 [{webhook_url[-20:]}...]，状态码: {resp.status_code}")
+                        log(f"Webhook 已发送 [{webhook_url[-20:]}...] 状态码={resp.status_code}", category="notify")
                     except Exception as e:
-                        log(f"-> Webhook 发送失败: {e}")
+                        log(f"Webhook 发送失败: {e}", level="warn", category="notify")
 
         # 3. RPA Notification (Windows only)
         target_group = rpa_group_mapping.get(assigned_to)
         if target_group:
             if sys.platform == 'win32' and HAS_UIAUTOMATION:
-                # self.send_rpa_notification(order_title, assigned_to, target_group)
-                log(f"-> [调试] RPA 通知已暂时禁用 (目标群: {target_group})")
+                log(f"RPA 通知已暂时禁用 (目标群: {target_group})", level="debug", category="rpa")
             else:
-                log(f"-> [提示] 跳过 RPA 通知 (非 Windows 环境或缺少依赖)")
+                log("跳过 RPA 通知 (非 Windows 环境或缺少依赖)", category="rpa")
 
     def send_rpa_notification(self, order_title, assigned_to, group_name):
         if not (sys.platform == 'win32' and HAS_UIAUTOMATION and HAS_PYPERCLIP):
-            log("无法发送 RPA 通知：环境不支持")
+            log("无法发送 RPA 通知：环境不支持", level="warn", category="rpa")
             return
 
         try:
@@ -499,7 +530,7 @@ class OrderScanner:
                 wechat_window = auto.WindowControl(searchDepth=1, ClassName="WeWorkWindow")
                 
             if not wechat_window.Exists(0):
-                log("-> [错误] 未找到企业微信窗口，RPA通知发送失败！")
+                log("未找到企业微信窗口，RPA通知发送失败", level="error", category="rpa")
                 return
                 
             wechat_window.SetActive()
@@ -523,10 +554,10 @@ class OrderScanner:
             wechat_window.SetTopmost(False)
             wechat_window.Minimize()
             
-            log(f"-> RPA 通知已发送")
+            log("RPA 通知已发送", category="rpa")
             
         except Exception as e:
-            log(f"-> RPA 发送通知时出错: {e}")
+            log(f"RPA 发送通知时出错: {e}", level="warn", category="rpa")
 
     def _run_loop(self):
         url = self.get_config("url", "")
@@ -547,7 +578,7 @@ class OrderScanner:
             headless = False
 
         if (not headless) and sys.platform.startswith("linux") and (not _linux_has_display()):
-            log("检测到 Linux 未配置 DISPLAY/WAYLAND_DISPLAY，自动切回 Headless 运行")
+            log("Linux 未配置 DISPLAY/WAYLAND_DISPLAY，自动切回 Headless", level="warn", category="system")
             headless = True
 
         slow_mo_val = self.get_config("slow_mo_ms", None)
@@ -558,7 +589,7 @@ class OrderScanner:
         except Exception:
             slow_mo_ms = 80 if not headless else 0
 
-        log(f"启动浏览器... (Headless: {headless})")
+        log(f"启动浏览器 (Headless: {headless})", category="system")
         
         try:
             with sync_playwright() as p:
@@ -642,9 +673,9 @@ class OrderScanner:
                 if HIGHLIGHT_ENABLED:
                     try:
                         init_highlight(page)
-                        log("元素高亮功能已初始化")
+                        log("元素高亮功能已初始化", category="system")
                     except Exception as e:
-                        log(f"元素高亮功能初始化失败: {e}")
+                        log(f"元素高亮功能初始化失败: {e}", level="warn", category="highlight")
 
                 import random
 
@@ -721,7 +752,7 @@ class OrderScanner:
                     pass_selector = "#form1 > div > div:nth-child(4) > input"
                     try:
                         if page.locator(user_selector).count() > 0:
-                            log("检测到登录页面，开始自动登录...")
+                            log("检测到登录页面，开始自动登录", category="login")
                             _human_type(user_selector, username)
                             _human_type(pass_selector, password)
                             try:
@@ -732,16 +763,16 @@ class OrderScanner:
                                 except Exception:
                                     pass
                             page.wait_for_load_state("networkidle")
-                            log("登录操作完成")
+                            log("登录操作完成", category="login")
                             try:
                                 if storage_state_path:
                                     context.storage_state(path=storage_state_path)
-                                    log(f"已保存登录态: {storage_state_path}")
+                                    log(f"已保存登录态: {storage_state_path}", category="login")
                             except Exception as e:
-                                log(f"保存登录态失败: {e}")
+                                log(f"保存登录态失败: {e}", level="warn", category="login")
                             return True
                     except Exception as e:
-                        log(f"自动登录尝试失败: {e}")
+                        log(f"自动登录尝试失败: {e}", level="warn", category="login")
                     return False
 
                 if self.stop_event.is_set():
@@ -762,7 +793,7 @@ class OrderScanner:
                     last_err = None
                     for sel in selectors:
                         try:
-                            log(f"导航点击准备: {label} selector={sel} {_safe_page_state()}")
+                            log(f"导航点击准备: {label} selector={sel}", category="nav")
                             loc = page.locator(sel).first
                             loc.wait_for(state="visible", timeout=timeout_ms)
                             try:
@@ -781,7 +812,7 @@ class OrderScanner:
                                     pass
                                 loc.click(force=True)
                             _human_pause()
-                            log(f"导航点击完成: {label} selector={sel} {_safe_page_state()}")
+                            log(f"导航点击完成: {label}", category="nav")
                             if wait_networkidle:
                                 try:
                                     page.wait_for_load_state("networkidle", timeout=timeout_ms)
@@ -792,7 +823,7 @@ class OrderScanner:
                                     init_highlight(page)
                                 except Exception:
                                     pass
-                            log(f"导航等待完成: {label} selector={sel} {_safe_page_state()}")
+                            log(f"导航等待完成: {label}", category="nav")
                             return
                         except Exception as e:
                             last_err = e
@@ -808,11 +839,11 @@ class OrderScanner:
                             try:
                                 if page.is_closed():
                                     page = context.new_page()
-                                    log("检测到页面已关闭，已重建新页面")
+                                    log("检测到页面已关闭，已重建新页面", level="warn", category="page")
                             except Exception:
                                 pass
                             def _goto_with_status(go_url, label):
-                                log(f"准备访问{label}: {go_url}")
+                                log(f"访问{label}: {_truncate_text(go_url, 80)}", category="page")
                                 r = page.goto(go_url, timeout=60000, wait_until="domcontentloaded")
                                 try:
                                     page.wait_for_load_state("networkidle", timeout=20000)
@@ -828,7 +859,7 @@ class OrderScanner:
                                     s = r.status if r else None
                                 except Exception:
                                     s = None
-                                log(f"{label}加载完成 status={s} {_safe_page_state()}")
+                                log(f"{label}加载完成 status={s}", category="page")
                                 return r, s
 
                             resp, status_code = _goto_with_status(login_url, "登录页")
@@ -840,7 +871,7 @@ class OrderScanner:
                             is_405 = (status_code == 405) or ("405" in str(title_val))
                             if is_405:
                                 if not headless:
-                                    log(f"检测到访问被拦截/风控(405)，请在有头浏览器中手动处理后继续 (等待 {manual_intervention_seconds:.0f}s)")
+                                    log(f"访问被拦截/风控(405)，请在有头浏览器中手动处理 (等待 {manual_intervention_seconds:.0f}s)", level="warn", category="risk")
                                     try:
                                         page.screenshot(path="debug_405.png", full_page=True)
                                     except Exception:
@@ -867,8 +898,8 @@ class OrderScanner:
                             if page.locator("#form1").count() > 0:
                                 perform_login()
                             else:
-                                log("未检测到登录表单，可能已处于登录态，跳过登录")
-                            log(f"登录流程结束 {_safe_page_state()}")
+                                log("未检测到登录表单，跳过登录", category="login")
+                            log("登录流程完成", category="login")
 
                             _click_nav("a.system_menu[menu_id='order_menu']", "订单菜单")
                             _click_nav("body > div.wb-subnav > div > div:nth-child(4)", "订单列表菜单")
@@ -884,20 +915,20 @@ class OrderScanner:
                                 page.wait_for_selector("#table", timeout=60000, state="visible")
                             except Exception:
                                 pass
-                            log(f"订单列表页面就绪 {_safe_page_state()}")
+                            log("订单列表页面就绪", category="nav")
                             try:
                                 if storage_state_path:
                                     context.storage_state(path=storage_state_path)
-                                    log(f"已刷新保存登录态: {storage_state_path}")
+                                    log(f"已刷新登录态: {storage_state_path}", category="login")
                             except Exception:
                                 pass
                             return True
                         except Exception as e:
-                            log(f"导航到待审核页失败 (attempt={attempt}/{max_attempts}): {e}")
-                            log(f"失败现场 {_safe_page_state()}")
+                            log(f"导航到待审核页失败 (attempt={attempt}/{max_attempts}): {e}", level="error", category="nav")
+                            log(f"页面状态: {_safe_page_state()}", level="debug", category="page")
                             try:
                                 page.screenshot(path="debug_last_page.png", full_page=True)
-                                log("已保存页面截图: debug_last_page.png")
+                                log("已保存页面截图: debug_last_page.png", level="debug", category="page")
                             except Exception:
                                 pass
                             self.stop_event.wait(5)
@@ -910,12 +941,12 @@ class OrderScanner:
                         pass
                     return
 
-                log("已进入待审核页面，开始执行自动化流程...")
+                log("已进入待审核页面，开始自动化流程", category="system")
 
                 while not self.stop_event.is_set():
-                    log(f"\n--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---")
+                    log(f"--- 开始新一轮检查 ({time.strftime('%H:%M:%S')}) ---", category="check")
                     try:
-                        log(f"页面信息: url={page.url}")
+                        log(f"页面: {_truncate_text(page.url, 80)}", category="page")
                     except Exception:
                         pass
                     
@@ -930,11 +961,11 @@ class OrderScanner:
                                 match = re.search(r"\((\d+)\)", tab_text)
                                 if match:
                                     count_val = int(match.group(1))
-                                    log(f"Tab 显示待审核数量: {count_val}")
+                                    log(f"待审核数量: {count_val}", category="scan")
                                     if count_val == 0:
                                         found_count = True
                     except Exception as e:
-                        log(f"检查 Tab 数量出错: {e}")
+                        log(f"检查 Tab 数量出错: {e}", level="debug", category="check")
 
                     if not found_count:
                          # Fallback to pagination count
@@ -942,7 +973,7 @@ class OrderScanner:
                         try:
                             if page.locator(count_selector).is_visible():
                                 count_text = page.locator(count_selector).inner_text().strip()
-                                log(f"分页器显示数量: {count_text}")
+                                log(f"分页器: {count_text}", category="scan")
                                 if count_text == "0":
                                     found_count = True
                         except:
@@ -950,9 +981,9 @@ class OrderScanner:
 
                     if found_count:
                         wait_seconds = _pick_interval_seconds(scan_interval, scan_interval_min, scan_interval_max)
-                        log(f"待审核数量为 0，等待 {wait_seconds:.1f} 秒后重试...")
+                        log(f"待审核数为0，等待 {wait_seconds:.1f}s", category="wait")
                         self.stop_event.wait(wait_seconds)
-                        log("正在刷新页面...")
+                        log("刷新页面", category="action")
                         try:
                             page.reload(timeout=60000)
                             page.wait_for_load_state("networkidle", timeout=60000)
@@ -980,10 +1011,10 @@ class OrderScanner:
                             pass
 
                         if not is_active and target_link.count() > 0:
-                            log("点击 '待审' Tab...")
+                            log("点击待审核 Tab", category="action")
                             if HIGHLIGHT_ENABLED:
                                 highlight_locator(page, target_link, "click")
-                            target_link.click()
+                            target_link.click(force=True)
                             page.wait_for_load_state("networkidle")
                             self.stop_event.wait(2)
                             if HIGHLIGHT_ENABLED:
@@ -992,13 +1023,13 @@ class OrderScanner:
                                 except Exception:
                                     pass
                     except Exception as e:
-                        log(f"点击 Tab 操作异常: {e}")
+                        log(f"点击 Tab 异常: {e}", level="warn", category="action")
 
                     # 3. Process List
                     container_selector = "#table > div > div > div"
                     items_locator = page.locator(f"{container_selector} > div")
                     items_count = items_locator.count()
-                    log(f"当前页面列表项总数: {items_count}")
+                    log(f"列表项总数: {items_count}", category="scan")
 
                     scan_stats = {
                         "row_total": 0,
@@ -1045,15 +1076,15 @@ class OrderScanner:
                                     if scan_stats["merchant_selector_missing"] <= 6:
                                         has_kw = "商户名称" in row_text
                                         log(
-                                            f"[调试] 未找到商户字段: idx={i} selector={merchant_selector} "
-                                            f"has_kw={has_kw} row={_truncate_text(_mask_sensitive(row_text))}"
+                                            f"idx={i} 未找到商户字段 (含关键词={has_kw})",
+                                            level="debug", category="scan"
                                         )
                                     continue
                             else:
                                 if not merchant_info.get("visible"):
                                     scan_stats["merchant_not_visible"] += 1
                                     if scan_stats["merchant_not_visible"] <= 3:
-                                        log(f"[调试] 商户字段不可见: idx={i} info={merchant_info}")
+                                        log(f"idx={i} 商户字段不可见", level="debug", category="scan")
                                     continue
                                 merchant_name = _safe_inner_text(merchant_loc, "").strip()
                                 merchant_name_clean = merchant_name.replace("商户名称：", "").replace("商户名称:", "").strip()
@@ -1062,11 +1093,7 @@ class OrderScanner:
                             if not merchant_name_clean:
                                 scan_stats["merchant_text_empty"] += 1
                                 if scan_stats["merchant_text_empty"] <= 3:
-                                    row_text = _safe_inner_text(item_loc, "")
-                                    log(
-                                        f"[调试] 商户文本为空: idx={i} source={merchant_source} "
-                                        f"raw={_truncate_text(_mask_sensitive(merchant_name))} row={_truncate_text(_mask_sensitive(row_text))}"
-                                    )
+                                    log(f"idx={i} 商户文本为空 (来源={merchant_source})", level="debug", category="scan")
                                 continue
 
                             merchant_top[merchant_name_clean] = merchant_top.get(merchant_name_clean, 0) + 1
@@ -1074,17 +1101,12 @@ class OrderScanner:
                             if merchant_name_clean != target_platform:
                                 scan_stats["merchant_non_target"] += 1
                                 if scan_stats["merchant_non_target"] <= 6:
-                                    row_text = _safe_inner_text(item_loc, "")
-                                    log(
-                                        f"[调试] 跳过非目标商户: idx={i} source={merchant_source} "
-                                        f"merchant={merchant_name_clean} raw={_truncate_text(_mask_sensitive(merchant_name))} "
-                                        f"row={_truncate_text(_mask_sensitive(row_text))}"
-                                    )
+                                    log(f"idx={i} 跳过 [{merchant_name_clean}] (非目标商户)", level="debug", category="scan")
                                 continue
 
                             scan_stats["merchant_target"] += 1
 
-                            log(f"-> 发现 {target_platform} 订单 (索引: {i})...")
+                            log(f"发现 {target_platform} 订单 (idx={i})", category="hit")
                             item_selector = current_item_selector
                             text_selector = f"{item_selector} > div:nth-child(2) > div.goods-des > a > div > div > span.text-primary"
                             
@@ -1094,25 +1116,23 @@ class OrderScanner:
                                 text_info = _safe_locator_info(text_element)
                                 if text_info.get("count") == 0:
                                     scan_stats["order_text_missing"] += 1
-                                    row_text = _safe_inner_text(item_loc, "")
-                                    log(f"[调试] 未找到订单内容元素: idx={i} selector={text_selector} row={_truncate_text(_mask_sensitive(row_text))}")
+                                    log(f"idx={i} 未找到订单内容元素", level="debug", category="scan")
                                     continue
 
                                 text_content = _safe_inner_text(text_element, "").strip()
                                 if not text_content:
                                     scan_stats["order_text_empty"] += 1
-                                    row_text = _safe_inner_text(item_loc, "")
-                                    log(f"[调试] 订单内容为空: idx={i} info={text_info} row={_truncate_text(_mask_sensitive(row_text))}")
+                                    log(f"idx={i} 订单内容为空", level="debug", category="scan")
                                     continue
 
                                 row_text = _safe_inner_text(item_loc, "")
                                 extra_fields = _extract_order_fields(row_text)
-                                extra_kv = " ".join([f"{k}={v}" for k, v in extra_fields.items()])
-                                extra_part = f" {extra_kv}" if extra_kv else ""
-                                log(f"订单内容: {_truncate_text(_mask_sensitive(text_content), 500)} | merchant={merchant_name_clean}{extra_part}")
+                                order_no = extra_fields.get("order_no", "")
+                                order_no_part = f" | 订单号={order_no}" if order_no else ""
+                                log(f"订单: {_truncate_text(_mask_sensitive(text_content), 120)} | 商户={merchant_name_clean}{order_no_part}", category="detail")
                             except Exception as e:
                                 scan_stats["order_text_missing"] += 1
-                                log(f"获取订单内容失败: idx={i} err={e}")
+                                log(f"获取订单内容失败: idx={i} err={e}", level="warn", category="scan")
                                 continue
             
                             target_option = "米奇租赁官方"
@@ -1136,7 +1156,7 @@ class OrderScanner:
                                     matched_info = f"关键词匹配: {matched_kw} (规则: {keyword_entry}), {round_info}"
                                     break
 
-                            log(f"匹配结果: [{matched_info}] -> 分配给: [{target_option}]")
+                            log(f"匹配结果: {matched_info} -> 分配给: {target_option}", category="assign")
                             
                             # Assign
                             try:
@@ -1164,7 +1184,7 @@ class OrderScanner:
                                     assign_btn_label = "分配"
 
                                 if assign_btn.count() > 0:
-                                    log(f"点击{assign_btn_label}按钮...")
+                                    log(f"点击{assign_btn_label}按钮", category="action")
                                     try:
                                         assign_btn.wait_for(state="visible", timeout=5000)
                                     except Exception:
@@ -1177,7 +1197,7 @@ class OrderScanner:
                                         try:
                                             highlight_locator(page, assign_btn, "click")
                                         except Exception as e:
-                                            log(f"分配按钮高亮失败: {e}")
+                                            log(f"分配按钮高亮失败: {e}", level="debug", category="highlight")
                                     try:
                                         assign_btn.click(timeout=8000, no_wait_after=True)
                                     except Exception:
@@ -1200,14 +1220,14 @@ class OrderScanner:
                                                 """)
                                                 init_highlight(page)
                                             except Exception as e:
-                                                log(f"弹窗高亮初始化失败: {e}")
+                                                log(f"弹窗高亮初始化失败: {e}", level="debug", category="highlight")
                                         modal = page.locator("#ajaxModal").filter(has=page.locator("visible=true")).first
                                         
                                         # Click dropdown
                                         # Try user provided ID first, then fallback to generic class
                                         dropdown = modal.locator("#select2-chosen-2, .select2-choice, .select2-selection").filter(has=page.locator("visible=true")).first
                                         
-                                        log("点击商户下拉框...")
+                                        log("点击商户下拉框", category="action")
                                         dropdown.wait_for(state="visible", timeout=8000)
                                         try:
                                             dropdown.scroll_into_view_if_needed(timeout=5000)
@@ -1227,7 +1247,7 @@ class OrderScanner:
                                         ).filter(has=page.locator("visible=true")).first
                                         search_input.wait_for(state="visible", timeout=8000)
                                         
-                                        log(f"输入商户名称: {target_option}")
+                                        log(f"输入商户: {target_option}", category="action")
                                         if HIGHLIGHT_ENABLED:
                                             highlight_locator(page, search_input, "focus: input")
                                         search_input.fill(target_option)
@@ -1235,14 +1255,14 @@ class OrderScanner:
                                         search_input.press("Enter")
                                         
                                         # Click Confirm
-                                        log("点击确定按钮...")
+                                        log("点击确定按钮", category="action")
                                         try:
                                             ajax_confirm = modal.locator("form > div > div > div.modal-footer > button.btn.btn-primary").first
                                             if ajax_confirm.count() > 0 and ajax_confirm.is_visible():
                                                 if HIGHLIGHT_ENABLED:
                                                     highlight_locator(page, ajax_confirm, "click")
                                                 ajax_confirm.click(timeout=8000, no_wait_after=True)
-                                                log("分配操作提交完成")
+                                                log("分配完成", category="done")
                                             else:
                                                 # Scope to the visible modal
                                                 visible_modal = page.locator(".modal").filter(has=page.locator("visible=true"))
@@ -1252,12 +1272,12 @@ class OrderScanner:
                                                         if HIGHLIGHT_ENABLED:
                                                             highlight_locator(page, confirm_btn, "click")
                                                         confirm_btn.click(timeout=8000, no_wait_after=True)
-                                                        log("分配操作提交完成")
+                                                        log("分配完成", category="done")
                                                     else:
-                                                        log("在弹窗中未找到确定按钮")
+                                                        log("在弹窗中未找到确定按钮", level="warn", category="assign")
                                                         # Log visible buttons for debugging
                                                         buttons = visible_modal.locator("button, input[type='button'], input[type='submit']").all_inner_texts()
-                                                        log(f"弹窗内可见按钮: {buttons}")
+                                                        log(f"弹窗内可见按钮: {buttons}", level="debug", category="assign")
                                                         raise Exception("未找到确定按钮")
                                                 else:
                                                     # Fallback to global search if modal structure is different
@@ -1265,9 +1285,9 @@ class OrderScanner:
                                                     if HIGHLIGHT_ENABLED:
                                                         highlight_locator(page, confirm_btn, "click")
                                                     confirm_btn.click(timeout=8000, no_wait_after=True)
-                                                    log("分配操作提交完成 (Fallback)")
+                                                    log("分配完成 (Fallback)", category="done")
                                         except Exception as e:
-                                            log(f"点击确定按钮失败: {e}")
+                                            log(f"点击确定按钮失败: {e}", level="error", category="assign")
                                             raise e
 
                                         # 记录分单
@@ -1294,35 +1314,31 @@ class OrderScanner:
                                         break
                                         
                                     except Exception as e:
-                                        log(f"分配弹窗操作失败: {e}")
+                                        log(f"分配弹窗操作失败: {e}", level="error", category="assign")
                                         # Try to close modal if stuck?
                                 else:
-                                    log("未找到分配按钮")
+                                    log("未找到分配按钮", level="warn", category="assign")
                                     # Debug: print available links in the row
                                     try:
                                         links = page.locator(item_selector).locator("a").all_inner_texts()
-                                        log(f"当前行可用链接: {links}")
+                                        log(f"当前行可用链接: {links}", level="debug", category="assign")
                                     except:
                                         pass
                             except Exception as e:
-                                log(f"点击分配按钮失败: {e}")
+                                log(f"点击分配按钮失败: {e}", level="error", category="assign")
 
                         except Exception as e:
-                            log(f"处理订单行出错: {e}")
+                            log(f"处理订单行出错: {e}", level="error", category="scan")
 
                     try:
-                        top_items = sorted(merchant_top.items(), key=lambda x: x[1], reverse=True)[:8]
-                        top_text = ", ".join([f"{name}:{cnt}" for name, cnt in top_items]) if top_items else "无"
+                        top_items = sorted(merchant_top.items(), key=lambda x: x[1], reverse=True)[:3]
+                        top_text = " | ".join([f"{name}({cnt})" for name, cnt in top_items]) if top_items else "无"
                         log(
-                            "本轮扫描统计: "
-                            f"rows={scan_stats['row_total']} "
-                            f"target={scan_stats['merchant_target']} "
-                            f"non_target={scan_stats['merchant_non_target']} "
-                            f"merchant_missing={scan_stats['merchant_selector_missing']} "
-                            f"merchant_invisible={scan_stats['merchant_not_visible']} "
-                            f"order_missing={scan_stats['order_text_missing']} "
-                            f"order_empty={scan_stats['order_text_empty']} "
-                            f"merchant_top={top_text}"
+                            f"共{scan_stats['row_total']}行 | "
+                            f"目标={scan_stats['merchant_target']} 跳过={scan_stats['merchant_non_target']} "
+                            f"缺字段={scan_stats['merchant_selector_missing']} | "
+                            f"主要商户: {top_text}",
+                            category="stats"
                         )
                     except Exception:
                         pass
@@ -1330,11 +1346,11 @@ class OrderScanner:
                     # Wait for next scan
                     if not self.stop_event.is_set():
                         if processed_count > 0:
-                            log(f"本轮已处理 {processed_count} 个订单，立即刷新页面继续...")
+                            log(f"已处理 {processed_count} 个订单，立即刷新继续", category="done")
                             self.stop_event.wait(2)
                         else:
                             wait_seconds = _pick_interval_seconds(scan_interval, scan_interval_min, scan_interval_max)
-                            log(f"本轮结束，等待 {wait_seconds:.1f} 秒...")
+                            log(f"本轮结束，等待 {wait_seconds:.1f}s", category="wait")
                             self.stop_event.wait(wait_seconds)
                         
                         try:
@@ -1344,13 +1360,13 @@ class OrderScanner:
                             pass
 
                 browser.close()
-                log("浏览器已关闭")
+                log("浏览器已关闭", category="system")
 
         except Exception as e:
-            log(f"运行过程中发生严重错误: {e}")
+            log(f"运行过程中发生严重错误: {e}", level="error", category="system")
         finally:
             self.running = False
-            log("服务已停止")
+            log("服务已停止", category="system")
 
 # Singleton instance
 scanner = OrderScanner()
